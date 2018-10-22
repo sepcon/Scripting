@@ -7,7 +7,6 @@ import subprocess
 import shutil
 
 gbWriteConsole = False
-gNoParamRegxPattern = re.compile("\(\s*\)")
 MOCK_METHOD="MOCK_METHOD"
 MOCK_CONST_METHOD="MOCK_CONST_METHOD"
 
@@ -85,6 +84,50 @@ class XMLElem:
             return prop
         else:
             return ""
+
+    @staticmethod
+    def findTagProp(elem, tagName, propName):
+        tag = elem.find(tagName)
+        if tag != None:
+            prop = tag.get(propName)
+            if prop != None:
+                return prop
+        return ""
+
+## Visitor patterns ?? not really that
+## Design approach:
+## 1. Data: Collect Discoverable Data from xml database and don't need to care about how to convert it to code
+##    Discoverable Data must provide functionality to expose its data to CodeGenerator via exposeTo(codeGentor CodeGenerator)
+##    follows the Visitor pattern
+###   IDiscoverable:
+##      `-- exposeTo(codeGentor)
+###
+##    Header: (.h file) --> CompoundType
+##         --- Members (Global functions, enums, variable)
+##         `-- Namespaces
+##          `- Classes
+##    Namespace: --> CompoundType
+##         --- Members (functions, enums, variables)
+##         `-- Sub-namespaces
+##          `- Inner-classes
+##    Classe: --> CompoundType
+##         --- Members (functions, enums, variables)
+##         `-- Inner-classes
+##    Member: --> MemberType
+##         ---  name
+##         `--  kind ( "enum", "function", "variable" ... )
+##          `-- scope - visibility
+##           `- parent - which CompoundType object it belongs to (class/namespace/header)
+##
+## 2. CodeGenerator: can provide many kinds of CodeGenerator, with the input is Discoverable Data
+##     Must provide below interfaces:
+###    ICodeGentor
+##      `-- onFunctionExposed(function DiscoverableData)
+##      `-- onVariableExposed(varialbe DiscoverableData)
+##      `-- onClassExposed(class DiscoverableData)
+##      `-- onNamespaceExposed(namespace DiscoverableData)
+##      `-- onHeaderExposed(header DiscoverableData)
+##      `-- onEnumExposed(enum DiscoverableData)
 
 class ICodeGentor:
     def onFunctionExposed(self, f):raise Exception("{0}: function onFunctionExposed has not implemented yet".format(self))
@@ -191,8 +234,8 @@ class GmockCodeGentor(ICodeGentor):
         self._activeMockHeaderWriter.writeln("namespace " + ns.compoundname.replace("::", " {\nnamespace ") + " {\n\n\n")  # open the namespace
 
         for member in ns.members: # Write enums if has
-            # if self._getHeader(member) == self._currentHeader:
-            member.exposeTo(self)
+            if member.file == self._currentHeader.originFilePath:
+                member.exposeTo(self)
 
         # forward declaration
         for cls in classes:
@@ -253,17 +296,6 @@ class GmockCodeGentor(ICodeGentor):
         else:
             return classPath[:idx]
 
-    def _getHeader(self, member):
-        header = member
-        try:
-            while header.parent != None:
-                header = header.parent
-            if isinstance(header, Header):
-                return member.parent
-            else:
-                return None
-        except AttributeError:
-            print()
 
     def _createWriter(self, path):
         print("Start writing to " + path)
@@ -293,6 +325,7 @@ class Member(IDiscoverable):
         self.name = XMLElem.findText(xmlMemberdef, "name")
         self.static = (XMLElem.getText(xmlMemberdef, "static") == "yes")
         self.scope = XMLElem.getText(xmlMemberdef, "prot")
+        self.file = XMLElem.findTagProp(xmlMemberdef, "location", "file")
 
 
 class Enum(Member):
@@ -315,9 +348,20 @@ class Enum(Member):
 class HasTypeMember(Member):
     def __init__(self, xmlMemberdef, parent = None):
         Member.__init__(self, xmlMemberdef, parent)
-        self.type = XMLElem.findText(xmlMemberdef, "type")
+        self.type = self._getType(xmlMemberdef)
         self.argsstring = XMLElem.findText(xmlMemberdef, "argsstring")
         self.definition = XMLElem.findText(xmlMemberdef, "definition")
+
+    def _getType(self, xmlMemberdef):
+        type = ""
+        typeTag = xmlMemberdef.find("type")
+        if typeTag != None:
+            if typeTag.text == None:
+                type = XMLElem.findText(typeTag, "ref")
+            else:
+                type = typeTag.text
+
+        return type
 
 class Function(HasTypeMember):
     def __init__(self, xmlMemberdef, parent = None):
@@ -393,7 +437,7 @@ class Class(CompoundType, IDiscoverable):
         self.name = ""
         self.subclasses = []
         self.parsed = False
-        self.shouldBeMocked = True
+        self.enums = []
 
     def isOrphan(self):
         return self.compoundname == self.name
