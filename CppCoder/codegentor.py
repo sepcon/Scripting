@@ -35,7 +35,7 @@ class ICodeGentor:
           `-- onHeaderExposed(header DiscoverableData)
           `-- onEnumExposed(enum DiscoverableData)
     '''
-
+    def genCode(self): raise Exception("genCode hasn't been implemented yet")
     def onFunctionExposed(self, f):raise Exception("{0}: function onFunctionExposed has not implemented yet".format(self))
     def onVariableExposed(self, v):raise Exception("{0}: function onVariableExposed has not implemented yet".format(self))
     def onClassExposed(self, c):raise Exception("{0}: function onClassExposed has not implemented yet".format(self))

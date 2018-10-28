@@ -1,19 +1,32 @@
 import os
-from CodeGentor import *
-from codedata.data import *
-from writer.CodeWriter import *
+import re
+from codegentor import *
+from data import *
+from codewriter import *
 
 gbWriteConsole = False
-MOCK_METHOD="MOCK_METHOD"
-MOCK_CONST_METHOD="MOCK_CONST_METHOD"
+
+def _cmpByLineOrder(codeObj1, codeObj2):
+        return codeObj1.location.line - codeObj2.location.line
 
 class GmockCodeGentor(ICodeGentor):
+    MOCK_METHOD = "MOCK_METHOD"
+    MOCK_CONST_METHOD = "MOCK_CONST_METHOD"
 
-    def __init__(self, workspace):
-        self.workspace = workspace
+    def __init__(self, projectData, outdir):
+        assert (projectData == None or isinstance(projectData, Project))
+        self.projectData = projectData
+        self.outdir = outdir
         self._activeHeaderWriter = None
         self._activeMockHeaderWriter = None
         self._currentHeader = None
+
+    def genCode(self):
+        if self.projectData == None or not self.projectData.ready:
+            raise Exception("Project data has not been ready yet")
+
+        for header in self.projectData.headers.values():
+            header.exposeTo(self)
 
     def onEnumExposed(self, e):
         assert (isinstance(e, Enum))
@@ -51,9 +64,9 @@ class GmockCodeGentor(ICodeGentor):
 
         lastCloseBracket = f.argsstring.rfind(")")
         if f.argsstring[lastCloseBracket:].find("const") != -1:
-            mockMethod = MOCK_CONST_METHOD
+            mockMethod = GmockCodeGentor.MOCK_CONST_METHOD
         else:
-            mockMethod = MOCK_METHOD
+            mockMethod = GmockCodeGentor.MOCK_METHOD
 
         argsstring = f.argsstring[:lastCloseBracket + 1]
 
@@ -80,7 +93,7 @@ class GmockCodeGentor(ICodeGentor):
         self._activeMockHeaderWriter.writeln(classDecl) # Open class
         self._activeMockHeaderWriter.increaseIndentLevel() # Start layouting section
 
-        self._genCodeForCodeObjects(c.members, c.subclasses)
+        self._genCodeForCodeObjects(c.members, c.innerclasses)
 
         self._activeMockHeaderWriter.decreaseIndentLevel() # End layouting section
         self._activeMockHeaderWriter.writeln("};") # Close class
@@ -94,7 +107,7 @@ class GmockCodeGentor(ICodeGentor):
 
     def onNamespaceExposed(self, ns):
         assert (isinstance(ns, Namespace))
-        curHeaderClasses = self._pickOnesInCurrentHeader(ns.classes)
+        curHeaderClasses = self._pickOnesInCurrentHeader(ns.innerclasses)
         curHeaderMembers = self._pickOnesInCurrentHeader(ns.members)
 
         if len(curHeaderClasses) == 0 and len(curHeaderMembers) == 0:
@@ -116,7 +129,7 @@ class GmockCodeGentor(ICodeGentor):
     def onHeaderExposed(self, h):
         assert (isinstance(h, Header))
         self._currentHeader = h
-        headerFilePath = os.path.join(self.workspace.outdir, os.path.basename(h.location.file))
+        headerFilePath = os.path.join(self.outdir, os.path.basename(h.location.file))
         self._activeHeaderWriter = self._createWriter(headerFilePath)
         self._activeMockHeaderWriter = self._createWriter(headerFilePath.replace(".h", "_mock.h"))
 
@@ -127,8 +140,7 @@ class GmockCodeGentor(ICodeGentor):
         self._activeHeaderWriter.writeln('#include "' + os.path.basename(self._activeMockHeaderWriter.name()) + '"')
 
     def _codeHeaderMock(self, header):
-        assert (header.parsed == True)
-
+        assert(header.dataAvailable)
         # Write include guard
         self._activeMockHeaderWriter.writeln(
             "#ifndef {0}\n#define {0}\n".format(
@@ -139,7 +151,7 @@ class GmockCodeGentor(ICodeGentor):
         self._activeMockHeaderWriter.writeln(header.createIncludeSection())
         self._activeMockHeaderWriter.writeln("\n\n\n")
         orphanClasses = []
-        for cls in header.classes:
+        for cls in header.innerclasses:
             if cls.isOrphan() : orphanClasses.append(cls)
 
         self._genCodeForCodeObjects(header.members, header.namespaces, orphanClasses)
@@ -172,8 +184,3 @@ class GmockCodeGentor(ICodeGentor):
         for cobj in totalList:
             cobj.exposeTo(self)
 
-
-
-    @staticmethod
-    def _cmpByLineOrder(codeObj1, codeObj2):
-        return codeObj1.location.line - codeObj2.location.line
