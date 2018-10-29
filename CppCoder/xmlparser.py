@@ -67,12 +67,7 @@ class XMLParser(DataParser):
         XMLParser._extractMemberInfo(member, xmlMemberdef)
         member.argsstring = xmlutil.findText(xmlMemberdef, "argsstring")
         member.definition = xmlutil.findText(xmlMemberdef, "definition")
-        typeTag = xmlMemberdef.find("type")
-        if typeTag != None:
-            if typeTag.text == None:
-                member.type = xmlutil.findText(typeTag, "ref")
-            else:
-                member.type = typeTag.text
+        member.type = xmlutil.joinTextOfEntireChildren(xmlMemberdef.find("type"))
 
     @staticmethod
     def _extractFunctionInfo(function, xmlMemberdef):
@@ -83,18 +78,13 @@ class XMLParser(DataParser):
         function.const = (xmlMemberdef.get("const") == "yes")
         function.virtualType = xmlMemberdef.get("virt")
 
-        def _extractFunctionParam(xmlparam):
-            xmltype = xmlparam.find("type")
-            print(xmltype.attrib)
-            type = xmlparam.findtext("type", "*") #xmlutil.findText(xmlparam, "type")
-            if xmltype != None:
-                typeref = xmlutil.findText(xmltype, "ref")
-                type = typeref + type
-
-            return Function.Parameter(type, xmlutil.findText(xmlparam, "declname"),
-                                           xmlutil.findText(xmlparam, "defval"))
-
-        function.paramsList += [ _extractFunctionParam(xmlparam) for xmlparam in xmlMemberdef.iter("param") ]
+        function.paramsList += \
+            [
+                Function.Parameter(xmlutil.joinTextOfEntireChildren(xmlparam.find("type")),
+                                   xmlutil.findText(xmlparam, "declname"),
+                                   xmlutil.findText(xmlparam, "defval"))
+                for xmlparam in xmlMemberdef.iter("param")
+            ]
 
 
     @staticmethod

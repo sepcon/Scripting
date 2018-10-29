@@ -9,24 +9,26 @@ def createXMLDB(path):
         return None
 
 def findText(elem, tag):
-    t = elem.find(tag)
-    if t != None and t.text != None:
-        return t.text
-    else:
-        return ""
-
+    return elem.findtext(tag, "")
 
 def getText(elem, propName):
-    prop = elem.get(propName)
-    if prop != None:
-        return prop
-    else:
-        return ""
+    return elem.get(propName, "")
 
 def findTagProp(elem, tagName, propName):
     tag = elem.find(tagName)
     if tag != None:
-        prop = tag.get(propName)
-        if prop != None:
-            return prop
-    return ""
+        return tag.get(propName, "")
+    else:
+        return ""
+
+def joinTextOfEntireChildren(elem, default=""):
+    if elem == None:
+        return default
+    if elem.text != None:
+        text = elem.text
+    else: text = default
+    for child in elem:
+        text += child.text
+        if child.tail != None:
+            text += child.tail
+    return text
