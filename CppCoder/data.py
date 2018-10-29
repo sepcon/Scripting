@@ -9,7 +9,7 @@ class CodeUnit:
     def __init__(self):
         self.kind = ""
         self.name = ""
-        self.location = None
+        self.location = CodeUnit.Location()
         self.parent = None
 
     def exposeTo(self, codeGentor): raise Exception("{0}: Function has not implemented yet".format(self))
@@ -42,7 +42,9 @@ class Function(HasTypeMember):
         self.virtualType = ""
         self.paramsList =  []
 
-
+    # def __copy__(self):
+    #     _cp = type(self)()
+    #
 
     def exposeTo(self, codeGentor):
         codeGentor.onFunctionExposed(self)
@@ -86,13 +88,13 @@ class CompoundType(CodeUnit):
     def __init__(self, refid):
         CodeUnit.__init__(self)
         self.refid = refid
+        self.compoundname = ""
         self.members = set()
         self.dataAvailable = False
 
 class Class(CompoundType):
-    def __init__(self, refid):
+    def __init__(self, refid=""):
         CompoundType.__init__(self, refid)
-        self.compoundname = ""
         self.name = ""
         self.innerclasses = []
         self.parsed = False
@@ -108,7 +110,6 @@ class Namespace(CompoundType):
     def __init__(self, refid):
         CompoundType.__init__(self, refid)
         self.innerclasses = set()
-        self.compoundname = ""
 
     def exposeTo(self, codeGentor):
         codeGentor.onNamespaceExposed(self)
@@ -126,6 +127,12 @@ class Header(CompoundType):
         self.innerclasses = set()
         self.includes = []
         self.parsed = False
+
+    def updateName(self):
+        if self.compoundname != "":
+            firstDotIdx = self.compoundname.find(".")
+            if firstDotIdx != -1: self.name = self.compoundname[:firstDotIdx]
+            else: self.name = self.compoundname
 
     def exposeTo(self, codeGentor):
         codeGentor.onHeaderExposed(self)

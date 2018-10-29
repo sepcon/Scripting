@@ -1,7 +1,7 @@
 import xmlutil
 from data import *
-from coder import *
-
+from dataparser import DataParser
+from environ import *
 
 def _toLineNumber(string):
     try:
@@ -33,12 +33,6 @@ class XMLParser(DataParser):
         parseComounds(self.project.headers, XMLParser._extractHeaderInfo)
         parseComounds(self.project.namespaces, XMLParser._extractNamespaceInfo)
         parseComounds(self.project.classes, XMLParser._extractClassInfo)
-        # for header in self.project.headers.values():
-        #     self._extractHeaderInfo(header)
-        # for namespace in self.project.namespaces.values():
-        #     self._extractNamespaceInfo(namespace)
-        # for cls in self.project.classes.values():
-        #     self._extractClassInfo(cls)
 
         self.project.ready = True
 
@@ -88,9 +82,20 @@ class XMLParser(DataParser):
         function.inline = (xmlMemberdef.get("explicit") == "yes")
         function.const = (xmlMemberdef.get("const") == "yes")
         function.virtualType = xmlMemberdef.get("virt")
-        for xmlparam in xmlMemberdef.iter("param"):
-            function.paramsList.append(Function.Parameter(xmlutil.findText(xmlparam, "type"), xmlutil.findText(xmlparam, "declname"),
-                                           xmlutil.findText(xmlparam, "defval")))
+
+        def _extractFunctionParam(xmlparam):
+            xmltype = xmlparam.find("type")
+            print(xmltype.attrib)
+            type = xmlparam.findtext("type", "*") #xmlutil.findText(xmlparam, "type")
+            if xmltype != None:
+                typeref = xmlutil.findText(xmltype, "ref")
+                type = typeref + type
+
+            return Function.Parameter(type, xmlutil.findText(xmlparam, "declname"),
+                                           xmlutil.findText(xmlparam, "defval"))
+
+        function.paramsList += [ _extractFunctionParam(xmlparam) for xmlparam in xmlMemberdef.iter("param") ]
+
 
     @staticmethod
     def _extractVariableInfo(variable, xmlMemberdef):
@@ -105,12 +110,13 @@ class XMLParser(DataParser):
                 Enum.Value(
                 xmlutil.findText(xmlelem, "name"),
                 xmlutil.findText(xmlelem, "initializer")
-                ) for xmlelem in xmlMemberder.iter("enumvalue")
+                ) for xmlelem in xmlMemberdef.iter("enumvalue")
                 ]
 
     @staticmethod
     def _extractCompoundTypeInfo(compound, xmlCompounddef):
         XMLParser._extractCodeUnitInfo(compound, xmlCompounddef)
+        compound.compoundname = xmlutil.findText(xmlCompounddef, "compoundname")
         for sectiondef in xmlCompounddef.iter("sectiondef"):
             if sectiondef.get("kind") not in XMLParser.__kindsOfSectionVisibleToWorld:
                 continue
@@ -141,21 +147,19 @@ class XMLParser(DataParser):
         if compounddef == None: return False
 
         XMLParser._extractCompoundTypeInfo(cls, compounddef)
-
-        compoundname = compounddef.find("compoundname")
-        if compoundname != None:
-            cls.compoundname = compoundname.text
+        if cls.compoundname != "":
             lastOf2Colon = cls.compoundname.rfind(":")
             if lastOf2Colon == -1:
                 cls.name = cls.compoundname
             else:
                 cls.name = cls.compoundname[lastOf2Colon + 1:]
-            for innerclass in compounddef.iter("innerclass"):
-                cls.innerclasses.append(self.project.addClass(innerclass.get("refid")))
-            for innerclass in cls.innerclasses:
-                self._makeCompoundDataAvailable(innerclass, XMLParser._extractClassInfo)
 
-            return True
+                for innerclass in compounddef.iter("innerclass"):
+                    cls.innerclasses.append(self.project.addClass(innerclass.get("refid")))
+                for innerclass in cls.innerclasses:
+                    self._makeCompoundDataAvailable(innerclass, XMLParser._extractClassInfo)
+
+                return True
         else:
             return False
 
@@ -166,7 +170,7 @@ class XMLParser(DataParser):
         if compounddef == None:return False
 
         XMLParser._extractCompoundTypeInfo(namespace, compounddef)
-        namespace.compoundname = xmlutil.findText(compounddef, "compoundname")
+
         for innerclassDB in compounddef.iter("innerclass"):
             cls = self.project.addClass(innerclassDB.get("refid"))
             namespace.innerclasses.add(cls)
@@ -183,6 +187,7 @@ class XMLParser(DataParser):
         if compounddef == None: return False
 
         XMLParser._extractCompoundTypeInfo(header, compounddef)
+        header.updateName()
         for include in compounddef.iter("includes"):
             header.includes.append(Header.Include(include.text, xmlutil.getText(include, "local") == "yes"))
 
