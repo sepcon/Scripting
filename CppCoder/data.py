@@ -144,7 +144,7 @@ class Header(CompoundType):
         return cls in self.innerclasses
 
     def createIncludeSection(self):
-        includeStr = ""
+        includeStr = "#include <gmock/gmock.h>"
         for include in self.includes:
             if include.islocal:
                 incOpen = "<"

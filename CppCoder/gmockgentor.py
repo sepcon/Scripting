@@ -10,10 +10,28 @@ gbWriteConsole = False
 def _cmpByLineOrder(codeObj1, codeObj2):
         return codeObj1.location.line - codeObj2.location.line
 
-class GmockCodeGentor(ICodeGentor):
+class GmockCodeGentor:
     MOCK_METHOD = "MOCK_METHOD"
     MOCK_CONST_METHOD = "MOCK_CONST_METHOD"
 
+    def __init__(self, projectData, outdir):
+        assert (projectData == None or isinstance(projectData, Project))
+        self.projectData = projectData
+        self.outdir = outdir
+        self._curHeaderInfo = None
+        self._activeCodeWriter = None
+
+    def genCode(self):
+        if self.projectData == None or not self.projectData.ready:
+            raise Exception("Project data has not been ready yet")
+
+        headerGentor = _GMockHeaderGentor(self.outdir)
+        for header in self.projectData.headers.values():
+            header.exposeTo(headerGentor)
+
+
+
+class _GMockHeaderGentor(ICodeGentor):
     class _HeaderInfo:
         def __init__(self, header):
             self.setHeader(header)
@@ -32,29 +50,14 @@ class GmockCodeGentor(ICodeGentor):
                 self._globalMockClassInstance = self.getGlobalMockClassName() + "_instance"
             return self._globalMockClassInstance
 
-
         def _initializeClean(self):
             if hasattr(self, "_globalMockClassName"): del self._globalMockClassName
             if hasattr(self, "_globalMockClassInstance"): del self._globalMockClassInstance
             self.nonClassFunctionList = []
             self.header = None
 
-
-
-    def __init__(self, projectData, outdir):
-        assert (projectData == None or isinstance(projectData, Project))
-        self.projectData = projectData
+    def __init__(self, outdir):
         self.outdir = outdir
-        self._curHeaderInfo = None
-        self._activeCodeWriter = None
-
-
-    def genCode(self):
-        if self.projectData == None or not self.projectData.ready:
-            raise Exception("Project data has not been ready yet")
-
-        for header in self.projectData.headers.values():
-            header.exposeTo(self)
 
     def onEnumExposed(self, e):
         assert (isinstance(e, Enum))
@@ -71,27 +74,24 @@ class GmockCodeGentor(ICodeGentor):
         else:
             self._4f_createNonClassFunctionMock(f)
 
-
     def onVariableExposed(self, v):
         assert (isinstance(v, Variable))
         self._activeCodeWriter.writeln("{0} {1};".format(v.type, v.name))
 
-
     def onClassExposed(self, c):
-        assert(isinstance(c, Class))
-        classDecl = "\n"+ c.kind + " " + c.name + "\n{"
+        assert (isinstance(c, Class))
+        classDecl = "\n" + c.kind + " " + c.name + "\n{"
 
         if c.kind == "class":
             classDecl += "\npublic:"
 
-        self._activeCodeWriter.writeln(classDecl) # Open class
-        self._activeCodeWriter.increaseIndentLevel() # Start layouting section
+        self._activeCodeWriter.writeln(classDecl)  # Open class
+        self._activeCodeWriter.increaseIndentLevel()  # Start layouting section
 
         self._genCodeForCodeUnits(c.members, c.innerclasses)
 
-        self._activeCodeWriter.decreaseIndentLevel() # End layouting section
-        self._activeCodeWriter.writeln("};") # Close class
-
+        self._activeCodeWriter.decreaseIndentLevel()  # End layouting section
+        self._activeCodeWriter.writeln("};")  # Close class
 
     def onNamespaceExposed(self, ns):
         assert (isinstance(ns, Namespace))
@@ -102,7 +102,8 @@ class GmockCodeGentor(ICodeGentor):
             return
 
         # Write namespace declaration
-        self._activeCodeWriter.writeln("namespace " + ns.compoundname.replace("::", " {\nnamespace ") + " {\n")  # open the namespace
+        self._activeCodeWriter.writeln(
+            "namespace " + ns.compoundname.replace("::", " {\nnamespace ") + " {\n")  # open the namespace
 
         # forward declaration
         for cls in curHeaderClasses:
@@ -112,11 +113,12 @@ class GmockCodeGentor(ICodeGentor):
 
         self._genCodeForCodeUnits(curHeaderMembers, curHeaderClasses)
 
-        self._activeCodeWriter.writeln("}\t// namespace " + ns.compoundname.replace("::", "\n}\t// namespace ")) #Close the namespaces
+        self._activeCodeWriter.writeln(
+            "}\t// namespace " + ns.compoundname.replace("::", "\n}\t// namespace "))  # Close the namespaces
 
     def onHeaderExposed(self, h):
         assert (isinstance(h, Header))
-        self._curHeaderInfo = GmockCodeGentor._HeaderInfo(h)
+        self._curHeaderInfo = _GMockHeaderGentor._HeaderInfo(h)
         mockFilePath = os.path.join(self.outdir, os.path.basename(h.location.file))
         if h.refid != "":
             mockFilePath = mockFilePath.replace(".h", "_mock.h")
@@ -124,7 +126,6 @@ class GmockCodeGentor(ICodeGentor):
         self._4h_genMockHeader()
         self._4h_genFakeHeader()
         self._4h_createGloblMockHeader()
-
 
     def _4h_genMockHeader(self):
         assert (self._curHeaderInfo.header.dataAvailable and self._activeCodeWriter != None)
@@ -141,24 +142,26 @@ class GmockCodeGentor(ICodeGentor):
 
         self._genCodeForCodeUnits(self._curHeaderInfo.header.members,
                                   self._curHeaderInfo.header.namespaces,
-                                  [ cls for cls in self._curHeaderInfo.header.innerclasses if cls.isOrphan() ] #classes that are not in any namespace or other class
+                                  [cls for cls in self._curHeaderInfo.header.innerclasses if cls.isOrphan()]
+                                  # classes that are not in any namespace or other class
                                   )
 
         # Write include guard close
-        self._activeCodeWriter.writeln("#endif\n")
+        self._activeCodeWriter.writeln("\n#endif\n")
 
     def _4h_genFakeHeader(self):
         if self._curHeaderInfo.header.refid != "":
-            fakeWriter = self._createWriter(os.path.join(self.outdir, os.path.basename(self._curHeaderInfo.header.location.file) ) )
+            fakeWriter = self._createWriter(
+                os.path.join(self.outdir, os.path.basename(self._curHeaderInfo.header.location.file)))
             if len(self._curHeaderInfo.nonClassFunctionList) > 0:
                 fakeWriter.writeln('#include "{0}"'.format(self._curHeaderInfo.getGlobalMockClassName() + ".h"))
-                fakeWriter.writeln('static {0} {1};'.format(self._curHeaderInfo.getGlobalMockClassName(), self._curHeaderInfo.getGlobalMockClassInstance())) #define a static global mock instance
+                fakeWriter.writeln('static {0} {1};'.format(self._curHeaderInfo.getGlobalMockClassName(),
+                                                            self._curHeaderInfo.getGlobalMockClassInstance()))  # define a static global mock instance
             fakeWriter.writeln('#include "' + os.path.basename(self._activeCodeWriter.name()) + '"')
-
 
     def _4h_createGloblMockHeader(self):
         if len(self._curHeaderInfo.nonClassFunctionList) > 0:
-            header = Header("") #refid must be empty for global mock header
+            header = Header("")  # refid must be empty for global mock header
             header.dataAvailable = True
             header.name = self._curHeaderInfo.getGlobalMockClassName()
             header.location = CodeUnit.Location(header.name + ".h")
@@ -173,14 +176,14 @@ class GmockCodeGentor(ICodeGentor):
                 newFunc.parent = cls
                 newFunc.name = func.name
                 newFunc.type = func.type
+                newFunc.isStatic = False
                 newFunc.argsstring = func.argsstring
                 newFunc.paramsList = func.paramsList
                 newFunc.definition = func.definition
                 newFunc.location = header.location
                 cls.members.add(newFunc)
             header.innerclasses.add(cls)
-            header.exposeTo(GmockCodeGentor(self.projectData, self.outdir))
-
+            header.exposeTo(_GMockHeaderGentor(self.outdir)) #Create new header for writing mock for global functions
 
     def _4c_ExtractClassName(self, classPath):
         idx = classPath.rfind("::")
@@ -199,15 +202,14 @@ class GmockCodeGentor(ICodeGentor):
         assert (isinstance(func, Function))
         mockFuncName = func.name + "_mock"
         self._4f_createMockMethod(func, mockFuncName)
-        self._4f_writeFuncCallsToOtherFunc(func, mockFuncName)
+        self._activeCodeWriter.writeln(self._4f_createFuncThatCallsToOtherFunc(func, mockFuncName))
 
-    def _4f_writeFuncCallsToOtherFunc(self, func, otherFuncCall):
-        self._activeCodeWriter.writeln(
-            "{0} {1} {2} {{ {3}({4}); }}".format(func.type, func.name, func.argsstring, otherFuncCall,
-                                                 ", ".join([param.name for param in func.paramsList]))
-        )
 
-    def _4f_createMockMethod(self, func, altName = ""):
+    def _4f_createFuncThatCallsToOtherFunc(self, func, otherFuncCall):
+        return "{0} {1} {2} {{ {3}({4}); }}".format(func.type, func.name, func.argsstring, otherFuncCall,
+                                                 ", ".join([ param.name for param in func.paramsList ] ))
+
+    def _4f_createMockMethod(self, func, altName=""):
         assert (isinstance(func, Function))
         lastCloseBracket = func.argsstring.rfind(")")
         if func.argsstring[lastCloseBracket:].find("const") != -1:
@@ -215,24 +217,25 @@ class GmockCodeGentor(ICodeGentor):
         else:
             mockMethod = GmockCodeGentor.MOCK_METHOD
 
-        argsstring = ", ".join([ param.type + " " + param.name for param in func.paramsList ])
+        argsstring = ", ".join([param.type + " " + param.name for param in func.paramsList])
         if altName == "": altName = func.name
         self._activeCodeWriter.writeln(
             "{0}{1}({2}, {3} ({4}) );".format(mockMethod,
-                                          func.paramCount(),
-                                          altName,
-                                          func.type,
-                                          argsstring))
-    
+                                              func.paramCount(),
+                                              altName,
+                                              func.type,
+                                              argsstring))
+
     def _4f_createClassMethodMock(self, func):
-        if func.isStatic\
+        if func.isStatic \
                 or func.name.startswith("~") \
                 or func.name.startswith("operator") \
-                or (func.definition != None and func.definition.startswith("static")): #TBD: how to resolve static methods?? whats about singleton??
+                or (func.definition != None and func.definition.startswith(
+            "static")):  # TBD: how to resolve static methods?? whats about singleton??
             return
 
         # type == "" means Constructor
-        if func.isPureVirtual() or func.parent.kind == "struct" or func.type == "" :
+        if func.isPureVirtual() or func.parent.kind == "struct" or func.type == "":
             funcBody = ";"
             if func.type == "":
                 type = ""
@@ -253,15 +256,13 @@ class GmockCodeGentor(ICodeGentor):
         assert (isinstance(func, Function))
         self._curHeaderInfo.nonClassFunctionList.append(func)
         theCallToGlobalMockMethod = "{0}.{1}".format(self._curHeaderInfo.getGlobalMockClassInstance(), func.name)
-        self._4f_writeFuncCallsToOtherFunc(func, theCallToGlobalMockMethod)
-
+        self._activeCodeWriter.writeln("static inline " + self._4f_createFuncThatCallsToOtherFunc(func, theCallToGlobalMockMethod))
 
     def _pickCodeUnitsInCurrentHeader(self, codeUnitList):
         return [cobj for cobj in codeUnitList if cobj.location.file == self._curHeaderInfo.header.location.file]
 
     def _pickSpecificCodeUnits(self, codeUnitList, kind):
-        return [ unit for unit in codeUnitList if unit.kind == kind ]
-
+        return [unit for unit in codeUnitList if unit.kind == kind]
 
     def _genCodeForCodeUnits(self, *listOfCodeUnitList):
         '''each code object should be written to file in the same order as origin header file'''
@@ -270,7 +271,7 @@ class GmockCodeGentor(ICodeGentor):
             totalList += codeUnitList
 
         # sort to make sure the order is correct
-        totalList.sort(key= lambda obj: obj.location.line)
+        totalList.sort(key=lambda obj: obj.location.line)
         for cobj in totalList:
             cobj.exposeTo(self)
 

@@ -21,14 +21,5 @@ def findTagProp(elem, tagName, propName):
     else:
         return ""
 
-def joinTextOfEntireChildren(elem, default=""):
-    if elem == None:
-        return default
-    if elem.text != None:
-        text = elem.text
-    else: text = default
-    for child in elem:
-        text += child.text
-        if child.tail != None:
-            text += child.tail
-    return text
+def joinTextOfEntireChildren(elem, delim=""):
+    return delim.join(elem.itertext())
