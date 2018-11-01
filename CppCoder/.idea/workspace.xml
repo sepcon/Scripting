@@ -2,10 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="424bfbed-192c-417b-9aca-5aa245d0eedc" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/codegentor.py" beforeDir="false" afterPath="$PROJECT_DIR$/codegentor.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/data.py" beforeDir="false" afterPath="$PROJECT_DIR$/data.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/environ.py" beforeDir="false" afterPath="$PROJECT_DIR$/environ.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/gmockgentor.py" beforeDir="false" afterPath="$PROJECT_DIR$/gmockgentor.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/xmlparser.py" beforeDir="false" afterPath="$PROJECT_DIR$/xmlparser.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -23,22 +25,23 @@
       </usages-collector>
       <usages-collector id="statistics.file.extensions.open">
         <counts>
-          <entry key="py" value="8" />
+          <entry key="py" value="10" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.open">
         <counts>
-          <entry key="Python" value="8" />
+          <entry key="Python" value="10" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="py" value="508" />
+          <entry key="Python Console" value="58" />
+          <entry key="py" value="2857" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
-          <entry key="Python" value="508" />
+          <entry key="Python" value="2915" />
         </counts>
       </usages-collector>
     </session>
@@ -53,8 +56,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/main.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="360">
-              <caret line="24" lean-forward="true" selection-start-line="24" selection-end-line="24" />
+            <state relative-caret-position="340">
+              <caret line="79" column="29" lean-forward="true" selection-start-line="79" selection-start-column="29" selection-end-line="79" selection-end-column="29" />
               <folding>
                 <element signature="e#37#54#0" expanded="true" />
               </folding>
@@ -62,35 +65,52 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/gmockgentor.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="213">
-              <caret line="139" column="79" selection-start-line="139" selection-start-column="79" selection-end-line="139" selection-end-column="79" />
+            <state relative-caret-position="355">
+              <caret line="307" column="158" selection-start-line="307" selection-start-column="158" selection-end-line="307" selection-end-column="158" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
-                <marker date="1540966461463" expanded="true" signature="958:959" ph="..." />
-                <marker date="1540966461463" expanded="true" signature="1053:1062" ph="..." />
-                <marker date="1540966461463" expanded="true" signature="1953:1988" ph="..." />
+                <marker date="1541073238121" expanded="true" signature="956:957" ph="..." />
+                <marker date="1541073238121" expanded="true" signature="1051:1060" ph="..." />
+                <marker date="1541073238121" expanded="true" signature="2016:2104" ph="..." />
+                <marker date="1541073238121" expanded="true" signature="12416:12440" ph="..." />
+                <marker date="1541073238121" expanded="true" signature="12732:13591" ph="..." />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/data.py">
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/codegentor.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="216">
-              <caret line="161" column="25" lean-forward="true" selection-start-line="161" selection-start-column="25" selection-end-line="161" selection-end-column="25" />
+            <state relative-caret-position="309">
+              <caret line="36" column="7" lean-forward="true" selection-start-line="36" selection-start-column="7" selection-end-line="36" selection-end-column="7" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file:///media/sf_WINDOWS_SHARE_TO_UBUNTU/Scripts/gnumake2qmake.py">
+        <entry file="file://$PROJECT_DIR$/data.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="416">
-              <caret line="513" lean-forward="true" selection-start-line="513" selection-end-line="513" />
+            <state relative-caret-position="183">
+              <caret line="67" column="8" selection-start-line="67" selection-start-column="8" selection-end-line="67" selection-end-column="8" />
+              <folding>
+                <marker date="1541071345302" expanded="true" signature="334:369" ph="..." />
+                <marker date="1541071345302" expanded="true" signature="826:1058" ph="..." />
+                <marker date="1541071345302" expanded="true" signature="3032:3093" ph="..." />
+                <marker date="1541071345302" expanded="true" signature="3821:3860" ph="..." />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/codewriter.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="201">
+              <caret line="21" column="29" selection-start-line="21" selection-start-column="29" selection-end-line="21" selection-end-column="29" />
             </state>
           </provider>
         </entry>
@@ -98,10 +118,11 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/xmlparser.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-750">
-              <caret line="10" lean-forward="true" selection-start-line="10" selection-end-line="10" />
+            <state relative-caret-position="243">
+              <caret line="69" column="127" selection-start-line="69" selection-start-column="127" selection-end-line="69" selection-end-column="127" />
               <folding>
                 <element signature="e#0#14#0" expanded="true" />
+                <marker date="1541072869425" expanded="true" signature="2931:3050" ph="..." />
               </folding>
             </state>
           </provider>
@@ -110,8 +131,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/environ.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="30">
-              <caret line="2" column="9" selection-start-line="2" selection-start-column="9" selection-end-line="2" selection-end-column="9" />
+            <state relative-caret-position="370">
+              <caret line="41" column="16" selection-start-line="41" selection-start-column="16" selection-end-line="41" selection-end-column="16" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -135,27 +156,46 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>GmockCodeGentor</find>
-      <find>projectData</find>
-      <find>outdir</find>
-      <find>_GMockHeaderGentor</find>
       <find>#endif</find>
       <find>WorkSpace</find>
       <find>Funcion</find>
       <find>_4f_writeFuncCallsToOtherFunc</find>
       <find>_4f_writeFuncThatCallsToOtherFunc</find>
-      <find>_4f_createFuncThatCallsToOtherFunc</find>
-      <find>print</find>
       <find>copyfile</find>
       <find>include</find>
+      <find>_extractFunctionInfo</find>
+      <find>_extractCompoundTypeInfo</find>
+      <find>_pickSpecificCodeUnits</find>
+      <find>enums</find>
+      <find>innerclasses</find>
+      <find>curHeaderClasses</find>
+      <find>_pickCodeUnitsInCurrentHeader</find>
+      <find>.members</find>
+      <find>_genCodeForCodeUnits</find>
+      <find>_4f_createFuncThatCallsToOtherFunc</find>
+      <find>.innerclasses</find>
+      <find>print</find>
+      <find>members</find>
+      <find>theCallToGlobalMockMethod</find>
+      <find>setpare</find>
+      <find>.location =</find>
+      <find>_genCodeForCompoundNonClassTypeMembers</find>
+      <find>arg</find>
+      <find>Location</find>
+      <find>isPureVirtual</find>
+      <find>__kindsOfSectionVisibleToWorld</find>
+      <find>_curHeaderInfo</find>
+      <find>globalFunctionMockStaticInstance</find>
     </findStrings>
     <replaceStrings>
       <replace>Worker</replace>
       <replace>_GMockHeaderGentor</replace>
       <replace>_4f_writeFuncThatCallsToOtherFunc</replace>
+      <replace>_4f_createFuncThatCallsToOtherFunc</replace>
       <replace>print(</replace>
       <replace>dojob</replace>
-      <replace>_4f_createFuncThatCallsToOtherFunc</replace>
+      <replace>getCodeUnitsInCurrentHeader</replace>
+      <replace>.members()</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -165,10 +205,12 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/environ.py" />
-        <option value="$PROJECT_DIR$/gmockgentor.py" />
         <option value="/media/sf_WINDOWS_SHARE_TO_UBUNTU/Scripts/gnumake2qmake.py" />
-        <option value="$PROJECT_DIR$/main.py" />
+        <option value="$PROJECT_DIR$/codegentor.py" />
         <option value="$PROJECT_DIR$/data.py" />
+        <option value="$PROJECT_DIR$/main.py" />
+        <option value="$PROJECT_DIR$/xmlparser.py" />
+        <option value="$PROJECT_DIR$/gmockgentor.py" />
       </list>
     </option>
   </component>
@@ -258,20 +300,20 @@
     <frame x="-1" y="-1" width="1922" height="1076" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info id="Favorites" side_tool="true" />
       <window_info content_ui="combo" id="Project" order="0" sideWeight="0.362776" visible="true" weight="0.24986821" />
-      <window_info id="Structure" order="1" sideWeight="0.63722396" side_tool="true" visible="true" weight="0.24986821" />
-      <window_info anchor="bottom" id="Version Control" />
-      <window_info anchor="bottom" id="Python Console" />
-      <window_info anchor="bottom" id="Terminal" />
-      <window_info anchor="bottom" id="Event Log" side_tool="true" />
+      <window_info active="true" id="Structure" order="1" sideWeight="0.63722396" side_tool="true" visible="true" weight="0.24986821" />
+      <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.32980973" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.32980973" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.39957717" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="bottom" id="Version Control" order="7" />
+      <window_info anchor="bottom" id="Terminal" order="8" />
+      <window_info anchor="bottom" id="Python Console" order="9" visible="true" weight="0.32980973" />
+      <window_info anchor="bottom" id="Event Log" order="10" side_tool="true" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
@@ -290,9 +332,6 @@
     </expressions>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/dataparser.py">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
     <entry file="file://$PROJECT_DIR$/xmlutil.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="225">
@@ -303,60 +342,93 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/xmlparser.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-750">
-          <caret line="10" lean-forward="true" selection-start-line="10" selection-end-line="10" />
-          <folding>
-            <element signature="e#0#14#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/environ.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="30">
-          <caret line="2" column="9" selection-start-line="2" selection-start-column="9" selection-end-line="2" selection-end-column="9" />
+        <state relative-caret-position="370">
+          <caret line="41" column="16" selection-start-line="41" selection-start-column="16" selection-end-line="41" selection-end-column="16" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/dataparser.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
     <entry file="file:///media/sf_WINDOWS_SHARE_TO_UBUNTU/Scripts/gnumake2qmake.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="416">
+        <state relative-caret-position="430">
           <caret line="513" lean-forward="true" selection-start-line="513" selection-end-line="513" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/codewriter.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="201">
+          <caret line="21" column="29" selection-start-line="21" selection-start-column="29" selection-end-line="21" selection-end-column="29" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/main.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="360">
-          <caret line="24" lean-forward="true" selection-start-line="24" selection-end-line="24" />
+        <state relative-caret-position="340">
+          <caret line="79" column="29" lean-forward="true" selection-start-line="79" selection-start-column="29" selection-end-line="79" selection-end-column="29" />
           <folding>
             <element signature="e#37#54#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/gmockgentor.py">
+    <entry file="file://$PROJECT_DIR$/codegentor.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="213">
-          <caret line="139" column="79" selection-start-line="139" selection-start-column="79" selection-end-line="139" selection-end-column="79" />
-          <folding>
-            <element signature="e#0#9#0" expanded="true" />
-            <marker date="1540966461463" expanded="true" signature="958:959" ph="..." />
-            <marker date="1540966461463" expanded="true" signature="1053:1062" ph="..." />
-            <marker date="1540966461463" expanded="true" signature="1953:1988" ph="..." />
-          </folding>
+        <state relative-caret-position="309">
+          <caret line="36" column="7" lean-forward="true" selection-start-line="36" selection-start-column="7" selection-end-line="36" selection-end-column="7" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/data.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="216">
-          <caret line="161" column="25" lean-forward="true" selection-start-line="161" selection-start-column="25" selection-end-line="161" selection-end-column="25" />
+        <state relative-caret-position="183">
+          <caret line="67" column="8" selection-start-line="67" selection-start-column="8" selection-end-line="67" selection-end-column="8" />
+          <folding>
+            <marker date="1541071345302" expanded="true" signature="334:369" ph="..." />
+            <marker date="1541071345302" expanded="true" signature="826:1058" ph="..." />
+            <marker date="1541071345302" expanded="true" signature="3032:3093" ph="..." />
+            <marker date="1541071345302" expanded="true" signature="3821:3860" ph="..." />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$USER_HOME$/.PyCharmCE2018.2/system/python_stubs/-1247971765/builtins.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="201">
+          <caret line="4844" column="8" selection-start-line="4844" selection-start-column="8" selection-end-line="4844" selection-end-column="8" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/xmlparser.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="243">
+          <caret line="69" column="127" selection-start-line="69" selection-start-column="127" selection-end-line="69" selection-end-column="127" />
+          <folding>
+            <element signature="e#0#14#0" expanded="true" />
+            <marker date="1541072869425" expanded="true" signature="2931:3050" ph="..." />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/gmockgentor.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="355">
+          <caret line="307" column="158" selection-start-line="307" selection-start-column="158" selection-end-line="307" selection-end-column="158" />
+          <folding>
+            <element signature="e#0#9#0" expanded="true" />
+            <marker date="1541073238121" expanded="true" signature="956:957" ph="..." />
+            <marker date="1541073238121" expanded="true" signature="1051:1060" ph="..." />
+            <marker date="1541073238121" expanded="true" signature="2016:2104" ph="..." />
+            <marker date="1541073238121" expanded="true" signature="12416:12440" ph="..." />
+            <marker date="1541073238121" expanded="true" signature="12732:13591" ph="..." />
+          </folding>
         </state>
       </provider>
     </entry>

@@ -29,8 +29,6 @@ class GmockCodeGentor:
         for header in self.projectData.headers.values():
             header.exposeTo(headerGentor)
 
-
-
 class _GMockHeaderGentor(ICodeGentor):
     class _HeaderInfo:
         def __init__(self, header):
@@ -58,6 +56,9 @@ class _GMockHeaderGentor(ICodeGentor):
 
     def __init__(self, outdir):
         self.outdir = outdir
+
+    def onTypeDefExposed(self, t):
+        self._activeCodeWriter.writeln("typedef {0} {1};".format(t.type, t.name))
 
     def onEnumExposed(self, e):
         assert (isinstance(e, Enum))
@@ -88,17 +89,20 @@ class _GMockHeaderGentor(ICodeGentor):
         self._activeCodeWriter.writeln(classDecl)  # Open class
         self._activeCodeWriter.increaseIndentLevel()  # Start layouting section
 
-        self._genCodeForCodeUnits(c.members, c.innerclasses)
+        self._genCodeForCodeUnits(c.members(), c.innerclasses)
 
         self._activeCodeWriter.decreaseIndentLevel()  # End layouting section
         self._activeCodeWriter.writeln("};")  # Close class
 
     def onNamespaceExposed(self, ns):
         assert (isinstance(ns, Namespace))
-        curHeaderClasses = self._pickCodeUnitsInCurrentHeader(ns.innerclasses)
-        curHeaderMembers = self._pickCodeUnitsInCurrentHeader(ns.members)
+        innerclasses = self._pickCodeUnitsInCurrentHeader(ns.innerclasses)
+        enums = self._pickCodeUnitsInCurrentHeader(ns.enums)
+        typedefs = self._pickCodeUnitsInCurrentHeader(ns.typedefs)
+        functions = self._pickCodeUnitsInCurrentHeader(ns.functions)
+        variables = self._pickCodeUnitsInCurrentHeader(ns.variables)
 
-        if len(curHeaderClasses) == 0 and len(curHeaderMembers) == 0:
+        if len(innerclasses) == 0 and len(enums) == 0 and len(functions) == 0 and len(variables) == 0 :
             return
 
         # Write namespace declaration
@@ -106,12 +110,13 @@ class _GMockHeaderGentor(ICodeGentor):
             "namespace " + ns.compoundname.replace("::", " {\nnamespace ") + " {\n")  # open the namespace
 
         # forward declaration
-        for cls in curHeaderClasses:
+        for cls in innerclasses:
             self._activeCodeWriter.writeln("class " + cls.name + ";")
 
         self._activeCodeWriter.writeln(" ")
 
-        self._genCodeForCodeUnits(curHeaderMembers, curHeaderClasses)
+        # self._genCodeForCodeUnits(curHeaderMembers, curHeaderClasses)
+        self._genCodeForCompoundNonClassTypeMembers(enums, typedefs, innerclasses, functions)
 
         self._activeCodeWriter.writeln(
             "}\t// namespace " + ns.compoundname.replace("::", "\n}\t// namespace "))  # Close the namespaces
@@ -125,7 +130,7 @@ class _GMockHeaderGentor(ICodeGentor):
         self._activeCodeWriter = self._createWriter(mockFilePath)
         self._4h_genMockHeader()
         self._4h_genFakeHeader()
-        self._4h_createGloblMockHeader()
+        # self._4h_createGloblMockHeader()
 
     def _4h_genMockHeader(self):
         assert (self._curHeaderInfo.header.dataAvailable and self._activeCodeWriter != None)
@@ -140,7 +145,7 @@ class _GMockHeaderGentor(ICodeGentor):
             self._activeCodeWriter.writeln(self._curHeaderInfo.header.createIncludeSection())
             self._activeCodeWriter.writeln("\n")
 
-        self._genCodeForCodeUnits(self._curHeaderInfo.header.members,
+        self._genCodeForCodeUnits(self._curHeaderInfo.header.members(),
                                   self._curHeaderInfo.header.namespaces,
                                   [cls for cls in self._curHeaderInfo.header.innerclasses if cls.isOrphan()]
                                   # classes that are not in any namespace or other class
@@ -173,7 +178,6 @@ class _GMockHeaderGentor(ICodeGentor):
             cls.location = header.location
             for func in self._curHeaderInfo.nonClassFunctionList:
                 newFunc = Function()
-                newFunc.parent = cls
                 newFunc.name = func.name
                 newFunc.type = func.type
                 newFunc.isStatic = False
@@ -181,8 +185,8 @@ class _GMockHeaderGentor(ICodeGentor):
                 newFunc.paramsList = func.paramsList
                 newFunc.definition = func.definition
                 newFunc.location = header.location
-                cls.members.add(newFunc)
-            header.innerclasses.add(cls)
+                newFunc.setParent(cls)
+            header.innerclasses.append(cls)
             header.exposeTo(_GMockHeaderGentor(self.outdir)) #Create new header for writing mock for global functions
 
     def _4c_ExtractClassName(self, classPath):
@@ -241,7 +245,8 @@ class _GMockHeaderGentor(ICodeGentor):
                 type = ""
             else:
                 type = func.type + " "
-
+                if func.isPureVirtual():
+                    type = "virtual " + type
             if re.match("\(.*\)\s*=", func.argsstring) == None:
                 funcBody = "{}"
             self._activeCodeWriter.writeln(type + func.name + func.argsstring + funcBody)
@@ -254,8 +259,8 @@ class _GMockHeaderGentor(ICodeGentor):
 
     def _4f_createNonClassFunctionMock(self, func):
         assert (isinstance(func, Function))
-        self._curHeaderInfo.nonClassFunctionList.append(func)
-        theCallToGlobalMockMethod = "{0}.{1}".format(self._curHeaderInfo.getGlobalMockClassInstance(), func.name)
+        # self._curHeaderInfo.nonClassFunctionList.append(func)
+        theCallToGlobalMockMethod = self._curHeaderInfo.getGlobalMockClassInstance() + "." + func.name
         self._activeCodeWriter.writeln("static inline " + self._4f_createFuncThatCallsToOtherFunc(func, theCallToGlobalMockMethod))
 
     def _pickCodeUnitsInCurrentHeader(self, codeUnitList):
@@ -274,6 +279,33 @@ class _GMockHeaderGentor(ICodeGentor):
         totalList.sort(key=lambda obj: obj.location.line)
         for cobj in totalList:
             cobj.exposeTo(self)
+
+    def _genCodeForCompoundNonClassTypeMembers(self, enums, typedefs, innerclasses, functions): # namespace and header
+        self._genCodeForCodeUnits(enums)
+        self._genCodeForCodeUnits(typedefs)
+        self._genCodeForCodeUnits(innerclasses)
+        self._genMockClassForGlobalFunctions(functions)
+        self._genCodeForCodeUnits(functions)
+
+    def _genMockClassForGlobalFunctions(self, functions):
+        cls = Class()
+        cls.dataAvailable = True
+        cls.name = self._curHeaderInfo.getGlobalMockClassName()
+        cls.compoundname = cls.name
+        cls.kind = "class"
+        cls.location = self._curHeaderInfo.header.location
+        for func in functions:
+            newFunc = Function()
+            newFunc.name = func.name
+            newFunc.type = func.type
+            newFunc.isStatic = False
+            newFunc.argsstring = func.argsstring
+            newFunc.paramsList = func.paramsList
+            newFunc.definition = func.definition
+            newFunc.location = self._curHeaderInfo.header.location
+            newFunc.setParent(cls)
+        cls.exposeTo(self)
+        self._activeCodeWriter.writeln("static {0} {1};".format(self._curHeaderInfo.getGlobalMockClassName(), self._curHeaderInfo.getGlobalMockClassInstance()))
 
     def _createWriter(self, path):
         print("Start writing to " + path)

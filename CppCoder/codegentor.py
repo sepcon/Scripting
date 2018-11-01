@@ -42,6 +42,7 @@ class ICodeGentor:
     def onNamespaceExposed(self, ns):raise Exception("{0}: function onNamespaceExposed has not implemented yet".format(self))
     def onHeaderExposed(self, h):raise Exception("{0}: function onHeaderExposed has not implemented yet".format(self))
     def onEnumExposed(self, e):raise Exception("{0}: function onEnumExposed has not implemented yet".format(self))
+    def onTypeDefExposed(self, t): Exception("{0}: function onTypeDefExposed has not implemented yet".format(self))
 
 
 

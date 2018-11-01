@@ -11,6 +11,8 @@ class CodeUnit:
         self.name = ""
         self.location = CodeUnit.Location()
         self.parent = None
+    def setParent(self, parent):
+        self.parent = parent
 
     def exposeTo(self, codeGentor): raise Exception("{0}: Function has not implemented yet".format(self))
 
@@ -26,6 +28,13 @@ class HasTypeMember(Member):
         self.type = ""
         self.argsstring = ""
         self.definition = ""
+class TypeDef(HasTypeMember):
+    def __init__(self): HasTypeMember.__init__(self)
+    def exposeTo(self, codeGentor):
+        codeGentor.onTypeDefExposed(self)
+    def setParent(self, parent):
+        self.parent = parent
+        parent.typedefs.append(self)
 
 class Function(HasTypeMember):
     class Parameter:
@@ -45,6 +54,9 @@ class Function(HasTypeMember):
     # def __copy__(self):
     #     _cp = type(self)()
     #
+
+    def setParent(self, compound):
+        compound.adoptFunction(self)
 
     def exposeTo(self, codeGentor):
         codeGentor.onFunctionExposed(self)
@@ -68,6 +80,10 @@ class Variable(HasTypeMember):
     def __init__(self):
         HasTypeMember.__init__(self)
 
+
+    def setParent(self, compound):
+        compound.adoptVariable(self)
+
     def exposeTo(self, codeGentor):
         codeGentor.onVariableExposed(self)
 
@@ -81,6 +97,9 @@ class Enum(Member):
         Member.__init__(self)
         self.values = []
 
+    def setParent(self, compound):
+        compound.adoptEnum(self)
+
     def exposeTo(self, codeGentor):
         codeGentor.onEnumExposed(self)
 
@@ -89,27 +108,48 @@ class CompoundType(CodeUnit):
         CodeUnit.__init__(self)
         self.refid = refid
         self.compoundname = ""
-        self.members = set()
         self.dataAvailable = False
+        self.typedefs = []
+        self.enums = []
+        self.variables = []
+        self.functions = []
+        self.innerclasses = []
+
+    def adoptTypeDef(self, t):
+        t.parent = self
+        self.typedefs.append(t)
+    def adoptEnum(self, e):
+        e.parent = self
+        self.enums.append(e)
+    def adoptVariable(self, v):
+        v.parent = self
+        self.variables.append(v)
+    def adoptFunction(self, f):
+        f.parent = self
+        self.functions.append(f)
+    def adoptClass(self, c):
+        c.parent = self
+        self.innerclasses.append(c)
+    def members(self):
+        return self.enums + self.typedefs + self.functions + self.variables
 
 class Class(CompoundType):
     def __init__(self, refid=""):
         CompoundType.__init__(self, refid)
         self.name = ""
-        self.innerclasses = []
         self.parsed = False
         self.enums = []
 
     def isOrphan(self):
         return self.compoundname == self.name
-
+    def setParent(self, compound):
+        compound.adoptClass(self)
     def exposeTo(self, codeGentor):
         codeGentor.onClassExposed(self)
 
 class Namespace(CompoundType):
     def __init__(self, refid):
         CompoundType.__init__(self, refid)
-        self.innerclasses = set()
 
     def exposeTo(self, codeGentor):
         codeGentor.onNamespaceExposed(self)
@@ -124,7 +164,6 @@ class Header(CompoundType):
     def __init__(self, refid):
         CompoundType.__init__(self, refid)
         self.namespaces = []
-        self.innerclasses = set()
         self.includes = []
         self.parsed = False
 

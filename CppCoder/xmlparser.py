@@ -10,7 +10,7 @@ def _toLineNumber(string):
         return 0
 
 class XMLParser(DataParser):
-    __kindsOfSectionVisibleToWorld = set(["public-func", "public-attrib", "public-type" , "enum", "func" ])
+    __kindsOfSectionVisibleToWorld = set(["public-func", "public-attrib", "public-type" , "enum", "func", "typedef" ])
 
     def __init__(self, workingDir):
         DataParser.__init__(self, workingDir)
@@ -67,7 +67,12 @@ class XMLParser(DataParser):
         XMLParser._extractMemberInfo(member, xmlMemberdef)
         member.argsstring = xmlutil.findText(xmlMemberdef, "argsstring")
         member.definition = xmlutil.findText(xmlMemberdef, "definition")
-        member.type = xmlutil.joinTextOfEntireChildren(xmlMemberdef.find("type"))
+        member.type = xmlutil.joinTextOfEntireChildren(xmlMemberdef.find("type")).replace("inline::", "").replace("const::", "")
+
+    @staticmethod
+    def _extractTypeDefInfo(typedef, xmlMemberDef):
+        assert (isinstance(typedef, TypeDef))
+        XMLParser._extractHasTypeMemberInfo(typedef, xmlMemberDef)
 
     @staticmethod
     def _extractFunctionInfo(function, xmlMemberdef):
@@ -120,12 +125,14 @@ class XMLParser(DataParser):
                     member = Function()
                     XMLParser._extractFunctionInfo(member, memberdef)
                 elif kind == "enum":
-                    member= Enum()
+                    member = Enum()
                     XMLParser._extractEnumInfo(member, memberdef)
+                elif kind == "typedef":
+                    member = TypeDef()
+                    XMLParser._extractTypeDefInfo(member, memberdef)
 
                 if member != None:
-                    compound.members.add(member)
-                    member.parent = compound
+                    member.setParent(compound)
 
         return True
 
@@ -145,7 +152,7 @@ class XMLParser(DataParser):
                 cls.name = cls.compoundname[lastOf2Colon + 1:]
 
                 for innerclass in compounddef.iter("innerclass"):
-                    cls.innerclasses.append(self.project.addClass(innerclass.get("refid")))
+                    self.project.addClass(innerclass.get("refid")).setParent(cls)
                 for innerclass in cls.innerclasses:
                     self._makeCompoundDataAvailable(innerclass, XMLParser._extractClassInfo)
 
@@ -163,7 +170,7 @@ class XMLParser(DataParser):
 
         for innerclassDB in compounddef.iter("innerclass"):
             cls = self.project.addClass(innerclassDB.get("refid"))
-            namespace.innerclasses.add(cls)
+            cls.setParent(namespace)
             self._makeCompoundDataAvailable(cls, XMLParser._extractClassInfo)
 
         return True
@@ -184,7 +191,7 @@ class XMLParser(DataParser):
         for innernamespaceDB in compounddef.iter("innernamespace"):
             header.namespaces.append(self.project.addNamespace(innernamespaceDB.get("refid")))
         for innerclassDB in compounddef.iter("innerclass"):
-            header.innerclasses.add(self.project.addClass(innerclassDB.get("refid")))
+            header.innerclasses.append(self.project.addClass(innerclassDB.get("refid")))
 
         return True
 

@@ -89,5 +89,5 @@ if __name__ == "__main__":
     argParser.parse()
     Worker(argParser.input, argParser.outdir).dojob()
 
-    # wsp = Worker(["/home/cgo1hc/Desktop/clSDS_AmbigNumberList.h"], "/home/cgo1hc/Desktop/sds_adapter_mock")
+    # wsp = Worker(["/home/cgo1hc/samba/views/nincg3_GEN/ai_projects/generated/components/asf/asf/NavigationService/dbus/src-gen/org/bosch/cm/navigation/NavigationServiceConst.h"], "/home/cgo1hc/Desktop/sds_adapter_mock")
     # wsp.dojob()
