@@ -439,6 +439,7 @@ __cmdepRemoteDebug() # 1.path/to/gdbinit 2.path/to/server/product 3.serverIP 4.p
         if [[ -z \$pid ]]; then 
             echo -e \"${CL_RED}Error: the $product is not running, please reboot the server and try aggain${CL_NONE}\";
         else
+            exchnd_ctl --set-sig SIGTRAP;
             gdbserver :$port --attach \$pid;
         fi"
     if [[ $gdbinitPath != "#" && -e $gdbinitPath ]]; then 
@@ -448,9 +449,9 @@ __cmdepRemoteDebug() # 1.path/to/gdbinit 2.path/to/server/product 3.serverIP 4.p
     
     __msg "Debug information: "
     __msg "GDBINIT     :\t$gdbinitPath"
-    __msg "APPLICATION:\t$product"
+    __msg "APPLICATION :\t$product"
     __msg "SERVER      :\t$serverIP"
-    __msg "PORT         :\t$port"
+    __msg "PORT        :\t$port"
     
     $remoteExec "which gdbserver >/dev/null"
     local errorCode=$?
