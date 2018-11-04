@@ -145,11 +145,20 @@ class XMLParser(DataParser):
 
         XMLParser._extractCompoundTypeInfo(cls, compounddef)
         if cls.compoundname != "":
-            lastOf2Colon = cls.compoundname.rfind(":")
-            if lastOf2Colon == -1:
+            inheritInfo = [
+                Class.InheritInfo(
+                    xmlutil.getText(basecompoundref, "refid"),
+                    basecompoundref.text,
+                    xmlutil.getText(basecompoundref, "prot"),
+                    xmlutil.getText(basecompoundref, "virt") == "virtual") for basecompoundref in compounddef.iter("basecompoundref")
+            ]
+            if len(inheritInfo) > 0: cls.inheritInfo = inheritInfo
+
+            lastOfColon = cls.compoundname.rfind(":")
+            if lastOfColon == -1:
                 cls.name = cls.compoundname
             else:
-                cls.name = cls.compoundname[lastOf2Colon + 1:]
+                cls.name = cls.compoundname[lastOfColon + 1:]
 
                 for innerclass in compounddef.iter("innerclass"):
                     self.project.addClass(innerclass.get("refid")).setParent(cls)

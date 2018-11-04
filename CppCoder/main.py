@@ -6,12 +6,15 @@ from gmockgentor import *
 
 
 class Worker:
-    def __init__(self, input, outdir, dataType="xml", codeGentorType = "gmocker"):
-        self.input = input
-        self.outdir = outdir
-        self.workingDir = os.path.join(outdir, ".tmp-mock-workspace")
-        self.dataType = dataType
-        self.codeGentorType = codeGentorType
+    def __init__(self):
+        checkEnviron()
+        argParser = ArgParser()
+        argParser.parse()
+        self.input = argParser.input
+        self.outdir = argParser.outdir
+        self.workingDir = os.path.join(self.outdir, ".tmp-mock-workspace")
+        self.dataType = "xml"
+        self.codeGentorType = "gmocker"
         self.parsed = False
 
     def __del__(self):
@@ -73,7 +76,7 @@ class Worker:
 
     def _clean(self):
         if self.workingDir != "":
-            os.system("rm -rf " + self.workingDir + " 2>/dev/null")
+            # os.system("rm -rf " + self.workingDir + " 2>/dev/null")
             self.input = ""
             self.outdir = ""
             self.workingDir = ""
@@ -84,10 +87,7 @@ class Worker:
             print("Workspace cleaned!")
 
 if __name__ == "__main__":
-    checkEnviron()
-    argParser = ArgParser()
-    argParser.parse()
-    Worker(argParser.input, argParser.outdir).dojob()
+    Worker().dojob()
 
     # wsp = Worker(["/home/cgo1hc/samba/views/nincg3_GEN/ai_projects/generated/components/asf/asf/NavigationService/dbus/src-gen/org/bosch/cm/navigation/NavigationServiceConst.h"], "/home/cgo1hc/Desktop/sds_adapter_mock")
     # wsp.dojob()

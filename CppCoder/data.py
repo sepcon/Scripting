@@ -75,6 +75,15 @@ class Function(HasTypeMember):
                 return True
             i -= 1
         return False
+    def isConstructor(self):
+        return isinstance(self.parent, Class) and self.name == self.parent.name
+    def isDestructor(self):
+        return isinstance(self.parent, Class) and self.name.find("~") != -1
+    def getReturnType(self):
+        if self.virtualType != "no-virtual":
+            return "virtual " + self.type
+        else:
+            return self.type
 
 class Variable(HasTypeMember):
     def __init__(self):
@@ -134,18 +143,30 @@ class CompoundType(CodeUnit):
         return self.enums + self.typedefs + self.functions + self.variables
 
 class Class(CompoundType):
+    class InheritInfo:
+        '''
+        InheritInfo contains the information related to base class:
+        1. baseref: refid of base class, from that we can query the base class's information via Project object
+        2. accessibility: accessibility < public, protected, private>
+        3. isVirtual: virtual inheritance or not
+        '''
+        def __init__(self, baseref = "", basename = "", accessibility = "public", isVirtual = False):
+            self.baseref = baseref
+            self.basename = basename
+            self.accessibility = accessibility
+            self.isVirtual = isVirtual
+
     def __init__(self, refid=""):
         CompoundType.__init__(self, refid)
-        self.name = ""
-        self.parsed = False
-        self.enums = []
+        self.inheritInfo = None
 
-    def isOrphan(self):
-        return self.compoundname == self.name
-    def setParent(self, compound):
-        compound.adoptClass(self)
-    def exposeTo(self, codeGentor):
-        codeGentor.onClassExposed(self)
+    def hasBase(self): return self.inheritInfo != None
+
+    def isOrphan(self): return self.compoundname == self.name
+
+    def setParent(self, compound): compound.adoptClass(self)
+
+    def exposeTo(self, codeGentor):codeGentor.onClassExposed(self)
 
 class Namespace(CompoundType):
     def __init__(self, refid):

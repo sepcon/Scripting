@@ -1,36 +1,47 @@
 import os
 import re
-from copy import deepcopy
 from codegentor import *
 from data import *
 from codewriter import *
 
 gbWriteConsole = False
 
-def _cmpByLineOrder(codeObj1, codeObj2):
-        return codeObj1.location.line - codeObj2.location.line
+class CodeGenConditioner:
+    '''
+    This class provides base interfaces for checking that header, namespace, class, function should be mocked or not
+    the condition depends on the type of project you're working on, the type of input and what are you expecting to have
+    '''
+    #Kinds of contitioner:
+    TYPE_MockAll = 0
+    TYPE_Asf = 1
+    TYPE_NormalMock = 2
+    TYPE_None = 3
 
-class GmockCodeGentor:
+    # which actions?
+    ACT_KeepOrigin = 0        # Do nothing    e.g: '          '
+    ACT_GenMock = 1           # Write as mock e.g: MOCK_METHOD0(func, void())
+    ACT_DefineEmpty = 2       # Write empty definition e.g: void function() {}
+    ACT_Ignore = 3
+
+    @staticmethod
+    def new(type):
+        if type == CodeGenConditioner.TYPE_NormalMock: return NormalMockConditioner()
+        elif type == CodeGenConditioner.TYPE_Asf: return AsfMockConditioner()
+        else: return CodeGenConditioner()
+
+    def __init__(self): self.projectData = None
+    def doWhatWithHeader(self, h): return CodeGenConditioner.ACT_Ignore
+    def doWhatWitClass(self, cls):return CodeGenConditioner.ACT_Ignore
+    def doWhatWithNamespace(self, ns): return CodeGenConditioner.ACT_Ignore
+    def doWhatWithFunction(self, f): return CodeGenConditioner.ACT_Ignore
+
+class GmockCodeGentor(ICodeGentor):
     MOCK_METHOD = "MOCK_METHOD"
     MOCK_CONST_METHOD = "MOCK_CONST_METHOD"
-
-    def __init__(self, projectData, outdir):
-        assert (projectData == None or isinstance(projectData, Project))
-        self.projectData = projectData
-        self.outdir = outdir
-        self._curHeaderInfo = None
-        self._activeCodeWriter = None
-
-    def genCode(self):
-        if self.projectData == None or not self.projectData.ready:
-            raise Exception("Project data has not been ready yet")
-
-        headerGentor = _GMockHeaderGentor(self.outdir)
-        for header in self.projectData.headers.values():
-            header.exposeTo(headerGentor)
-
-class _GMockHeaderGentor(ICodeGentor):
     class _HeaderInfo:
+        '''
+        Provide the information of current working header
+        '''
         def __init__(self, header):
             self.setHeader(header)
 
@@ -53,9 +64,24 @@ class _GMockHeaderGentor(ICodeGentor):
             if hasattr(self, "_globalMockClassInstance"): del self._globalMockClassInstance
             self.nonClassFunctionList = []
             self.header = None
-
-    def __init__(self, outdir):
+    def __init__(self, projectData, outdir, conditionerType = CodeGenConditioner.TYPE_NormalMock):
+        assert (projectData == None or isinstance(projectData, Project))
+        self.projectData = projectData
         self.outdir = outdir
+        self._curHeaderInfo = None
+        self._activeCodeWriter = None
+        self.__initializeConditioner(conditionerType)
+
+    def __initializeConditioner(self, type):
+        self.conditioner = CodeGenConditioner.new(type);
+        self.conditioner.projectData = self.projectData
+
+    def genCode(self):
+        if self.projectData == None or not self.projectData.ready:
+            raise Exception("Project data has not been ready yet")
+
+        for header in self.projectData.headers.values():
+            header.exposeTo(self)
 
     def onTypeDefExposed(self, t):
         self._activeCodeWriter.writeln("typedef {0} {1};".format(t.type, t.name))
@@ -71,9 +97,9 @@ class _GMockHeaderGentor(ICodeGentor):
     def onFunctionExposed(self, f):
         assert (isinstance(f, Function))
         if isinstance(f.parent, Class):
-            self._4f_createClassMethodMock(f)
+            self.__4f_createClassMethodMock(f)
         else:
-            self._4f_createNonClassFunctionMock(f)
+            self.__4f_createNonClassFunctionMock(f)
 
     def onVariableExposed(self, v):
         assert (isinstance(v, Variable))
@@ -81,7 +107,8 @@ class _GMockHeaderGentor(ICodeGentor):
 
     def onClassExposed(self, c):
         assert (isinstance(c, Class))
-        classDecl = "\n" + c.kind + " " + c.name + "\n{"
+
+        classDecl = "\n" + c.kind + " " + c.name + self.__4c_formInheritExpression(c) + "\n{"
 
         if c.kind == "class":
             classDecl += "\npublic:"
@@ -89,18 +116,18 @@ class _GMockHeaderGentor(ICodeGentor):
         self._activeCodeWriter.writeln(classDecl)  # Open class
         self._activeCodeWriter.increaseIndentLevel()  # Start layouting section
 
-        self._genCodeForCodeUnits(c.members(), c.innerclasses)
+        self.__genCodeForCodeUnits(c.members(), c.innerclasses)
 
         self._activeCodeWriter.decreaseIndentLevel()  # End layouting section
         self._activeCodeWriter.writeln("};")  # Close class
 
     def onNamespaceExposed(self, ns):
         assert (isinstance(ns, Namespace))
-        innerclasses = self._pickCodeUnitsInCurrentHeader(ns.innerclasses)
-        enums = self._pickCodeUnitsInCurrentHeader(ns.enums)
-        typedefs = self._pickCodeUnitsInCurrentHeader(ns.typedefs)
-        functions = self._pickCodeUnitsInCurrentHeader(ns.functions)
-        variables = self._pickCodeUnitsInCurrentHeader(ns.variables)
+        innerclasses = self.__pickCodeUnitsInCurrentHeader(ns.innerclasses)
+        enums = self.__pickCodeUnitsInCurrentHeader(ns.enums)
+        typedefs = self.__pickCodeUnitsInCurrentHeader(ns.typedefs)
+        functions = self.__pickCodeUnitsInCurrentHeader(ns.functions)
+        variables = self.__pickCodeUnitsInCurrentHeader(ns.variables)
 
         if len(innerclasses) == 0 and len(enums) == 0 and len(functions) == 0 and len(variables) == 0 :
             return
@@ -115,24 +142,24 @@ class _GMockHeaderGentor(ICodeGentor):
 
         self._activeCodeWriter.writeln(" ")
 
-        # self._genCodeForCodeUnits(curHeaderMembers, curHeaderClasses)
-        self._genCodeForCompoundNonClassTypeMembers(enums, typedefs, innerclasses, functions)
+        # self.__genCodeForCodeUnits(curHeaderMembers, curHeaderClasses)
+        self.__genCodeForCompoundNonClassTypeMembers(enums, typedefs, innerclasses, functions)
 
         self._activeCodeWriter.writeln(
             "}\t// namespace " + ns.compoundname.replace("::", "\n}\t// namespace "))  # Close the namespaces
 
     def onHeaderExposed(self, h):
         assert (isinstance(h, Header))
-        self._curHeaderInfo = _GMockHeaderGentor._HeaderInfo(h)
+        self._curHeaderInfo = GmockCodeGentor._HeaderInfo(h)
         mockFilePath = os.path.join(self.outdir, os.path.basename(h.location.file))
         if h.refid != "":
             mockFilePath = mockFilePath.replace(".h", "_mock.h")
-        self._activeCodeWriter = self._createWriter(mockFilePath)
-        self._4h_genMockHeader()
-        self._4h_genFakeHeader()
-        # self._4h_createGloblMockHeader()
+        self._activeCodeWriter = self.__createWriter(mockFilePath)
+        self.__4h_genMockHeader()
+        self.__4h_genFakeHeader()
+        # self.__4h_createGloblMockHeader()
 
-    def _4h_genMockHeader(self):
+    def __4h_genMockHeader(self):
         assert (self._curHeaderInfo.header.dataAvailable and self._activeCodeWriter != None)
         # Write include guard
         self._activeCodeWriter.writeln(
@@ -145,7 +172,7 @@ class _GMockHeaderGentor(ICodeGentor):
             self._activeCodeWriter.writeln(self._curHeaderInfo.header.createIncludeSection())
             self._activeCodeWriter.writeln("\n")
 
-        self._genCodeForCodeUnits(self._curHeaderInfo.header.members(),
+        self.__genCodeForCodeUnits(self._curHeaderInfo.header.members(),
                                   self._curHeaderInfo.header.namespaces,
                                   [cls for cls in self._curHeaderInfo.header.innerclasses if cls.isOrphan()]
                                   # classes that are not in any namespace or other class
@@ -154,9 +181,9 @@ class _GMockHeaderGentor(ICodeGentor):
         # Write include guard close
         self._activeCodeWriter.writeln("\n#endif\n")
 
-    def _4h_genFakeHeader(self):
+    def __4h_genFakeHeader(self):
         if self._curHeaderInfo.header.refid != "":
-            fakeWriter = self._createWriter(
+            fakeWriter = self.__createWriter(
                 os.path.join(self.outdir, os.path.basename(self._curHeaderInfo.header.location.file)))
             if len(self._curHeaderInfo.nonClassFunctionList) > 0:
                 fakeWriter.writeln('#include "{0}"'.format(self._curHeaderInfo.getGlobalMockClassName() + ".h"))
@@ -164,7 +191,7 @@ class _GMockHeaderGentor(ICodeGentor):
                                                             self._curHeaderInfo.getGlobalMockClassInstance()))  # define a static global mock instance
             fakeWriter.writeln('#include "' + os.path.basename(self._activeCodeWriter.name()) + '"')
 
-    def _4h_createGloblMockHeader(self):
+    def __4h_createGloblMockHeader(self):
         if len(self._curHeaderInfo.nonClassFunctionList) > 0:
             header = Header("")  # refid must be empty for global mock header
             header.dataAvailable = True
@@ -187,16 +214,29 @@ class _GMockHeaderGentor(ICodeGentor):
                 newFunc.location = header.location
                 newFunc.setParent(cls)
             header.innerclasses.append(cls)
-            header.exposeTo(_GMockHeaderGentor(self.outdir)) #Create new header for writing mock for global functions
+            header.exposeTo(GmockCodeGentor(self.projectData, self.outdir)) #Create new header for writing mock for global functions
 
-    def _4c_ExtractClassName(self, classPath):
-        idx = classPath.rfind("::")
-        if idx == -1:
+    def __4c_formInheritExpression(self, c):
+        assert (isinstance(c, Class))
+        if not c.hasBase():
             return ""
+        iExprList = []
+        for ii in c.inheritInfo:
+            if ii.isVirtual :
+                iExprList.append("{0} {1} {2}".format(ii.accessibility, "virtual", self.__4c_ExtractClassName(ii.basename)))
+            else:
+                iExprList.append("{0} {1}".format(ii.accessibility, self.__4c_ExtractClassName(ii.basename)))
+
+        return ": " + ", ".join(iExprList)
+
+    def __4c_ExtractClassName(self, classPath):
+        idx = classPath.rfind(":")
+        if idx == -1:
+            return classPath
         else:
             return classPath[:idx]
 
-    def _4f_createMockMethodWithDefaultParam(self, func):
+    def __4f_createMockMethodWithDefaultParam(self, func):
         '''With function has default parameter(s), we have to create a mock function with same name + extention mock:
         e.g: funcname: helloWorld --> helloWorld_mock
         and implement helloWorld as:
@@ -205,15 +245,15 @@ class _GMockHeaderGentor(ICodeGentor):
         '''
         assert (isinstance(func, Function))
         mockFuncName = func.name + "_mock"
-        self._4f_createMockMethod(func, mockFuncName)
-        self._activeCodeWriter.writeln(self._4f_createFuncThatCallsToOtherFunc(func, mockFuncName))
+        self.__4f_createMockMethod(func, mockFuncName)
+        self._activeCodeWriter.writeln(self.__4f_createFuncThatCallsToOtherFunc(func, mockFuncName))
 
 
-    def _4f_createFuncThatCallsToOtherFunc(self, func, otherFuncCall):
+    def __4f_createFuncThatCallsToOtherFunc(self, func, otherFuncCall):
         return "{0} {1} {2} {{ {3}({4}); }}".format(func.type, func.name, func.argsstring, otherFuncCall,
                                                  ", ".join([ param.name for param in func.paramsList ] ))
 
-    def _4f_createMockMethod(self, func, altName=""):
+    def __4f_createMockMethod(self, func, altName=""):
         assert (isinstance(func, Function))
         lastCloseBracket = func.argsstring.rfind(")")
         if func.argsstring[lastCloseBracket:].find("const") != -1:
@@ -230,46 +270,34 @@ class _GMockHeaderGentor(ICodeGentor):
                                               func.type,
                                               argsstring))
 
-    def _4f_createClassMethodMock(self, func):
-        if func.isStatic \
-                or func.name.startswith("~") \
-                or func.name.startswith("operator") \
-                or (func.definition != None and func.definition.startswith(
-            "static")):  # TBD: how to resolve static methods?? whats about singleton??
+    def __4f_createClassMethodMock(self, func):
+        action = self.conditioner.doWhatWithFunction(func)
+        if action == CodeGenConditioner.ACT_Ignore:
             return
+        elif action == CodeGenConditioner.ACT_DefineEmpty:
 
-        # type == "" means Constructor
-        if func.isPureVirtual() or func.parent.kind == "struct" or func.type == "":
-            funcBody = ";"
-            if func.type == "":
-                type = ""
-            else:
-                type = func.type + " "
-                if func.isPureVirtual():
-                    type = "virtual " + type
-            if re.match("\(.*\)\s*=", func.argsstring) == None:
-                funcBody = "{}"
-            self._activeCodeWriter.writeln(type + func.name + func.argsstring + funcBody)
-
-        else:
+            self._activeCodeWriter.writeln(func.getReturnType() + func.name + func.argsstring + "{}")
+        elif action == CodeGenConditioner.ACT_KeepOrigin:
+            self._activeCodeWriter.writeln(func.getReturnType() + func.name + func.argsstring + ";")
+        else: #action == CodeGenConditioner.ACT_GenMock
             if func.hasDefaultParam():
-                self._4f_createMockMethodWithDefaultParam(func)
+                self.__4f_createMockMethodWithDefaultParam(func)
             else:
-                self._4f_createMockMethod(func)
+                self.__4f_createMockMethod(func)
 
-    def _4f_createNonClassFunctionMock(self, func):
+    def __4f_createNonClassFunctionMock(self, func):
         assert (isinstance(func, Function))
         # self._curHeaderInfo.nonClassFunctionList.append(func)
         theCallToGlobalMockMethod = self._curHeaderInfo.getGlobalMockClassInstance() + "." + func.name
-        self._activeCodeWriter.writeln("static inline " + self._4f_createFuncThatCallsToOtherFunc(func, theCallToGlobalMockMethod))
+        self._activeCodeWriter.writeln("static inline " + self.__4f_createFuncThatCallsToOtherFunc(func, theCallToGlobalMockMethod))
 
-    def _pickCodeUnitsInCurrentHeader(self, codeUnitList):
+    def __pickCodeUnitsInCurrentHeader(self, codeUnitList):
         return [cobj for cobj in codeUnitList if cobj.location.file == self._curHeaderInfo.header.location.file]
 
-    def _pickSpecificCodeUnits(self, codeUnitList, kind):
+    def __pickSpecificCodeUnits(self, codeUnitList, kind):
         return [unit for unit in codeUnitList if unit.kind == kind]
 
-    def _genCodeForCodeUnits(self, *listOfCodeUnitList):
+    def __genCodeForCodeUnits(self, *listOfCodeUnitList):
         '''each code object should be written to file in the same order as origin header file'''
         totalList = []
         for codeUnitList in listOfCodeUnitList:
@@ -280,14 +308,16 @@ class _GMockHeaderGentor(ICodeGentor):
         for cobj in totalList:
             cobj.exposeTo(self)
 
-    def _genCodeForCompoundNonClassTypeMembers(self, enums, typedefs, innerclasses, functions): # namespace and header
-        self._genCodeForCodeUnits(enums)
-        self._genCodeForCodeUnits(typedefs)
-        self._genCodeForCodeUnits(innerclasses)
-        self._genMockClassForGlobalFunctions(functions)
-        self._genCodeForCodeUnits(functions)
+    def __genCodeForCompoundNonClassTypeMembers(self, enums, typedefs, innerclasses, functions): # namespace and header
+        self.__genCodeForCodeUnits(enums)
+        self.__genCodeForCodeUnits(typedefs)
+        self.__genCodeForCodeUnits(innerclasses)
+        self.__genMockClassForGlobalFunctions(functions)
+        self.__genCodeForCodeUnits(functions)
 
-    def _genMockClassForGlobalFunctions(self, functions):
+    def __genMockClassForGlobalFunctions(self, functions):
+        if len(functions) == 0:
+            return
         cls = Class()
         cls.dataAvailable = True
         cls.name = self._curHeaderInfo.getGlobalMockClassName()
@@ -307,9 +337,49 @@ class _GMockHeaderGentor(ICodeGentor):
         cls.exposeTo(self)
         self._activeCodeWriter.writeln("static {0} {1};".format(self._curHeaderInfo.getGlobalMockClassName(), self._curHeaderInfo.getGlobalMockClassInstance()))
 
-    def _createWriter(self, path):
+    def __createWriter(self, path):
         print("Start writing to " + path)
         if gbWriteConsole == True:
             return CppCodeWriter.new("console", path)
         else:
             return CppCodeWriter.new("file", path)
+
+class NormalMockConditioner(CodeGenConditioner):
+    def __init__(self): self.projectData = None
+    def doWhatWithHeader(self, h): return CodeGenConditioner.ACT_GenMock
+    def doWhatWitClass(self, cls): return CodeGenConditioner.ACT_GenMock
+    def doWhatWithNamespace(self, ns): return CodeGenConditioner.ACT_GenMock
+    def doWhatWithFunction(self, func):
+        if func.isStatic \
+                or func.isDestructor() \
+                or func.name.startswith("operator") \
+                or (func.definition != None and func.definition.startswith(
+            "static")):  # TBD: how to resolve static methods?? whats about singleton??
+            return CodeGenConditioner.ACT_Ignore
+
+        # type == "" means Constructor
+        funcDefinedByLanguage = re.match("\(.*\)\s*=", func.argsstring) != None and not func.isPureVirtual()
+        if funcDefinedByLanguage:
+            return CodeGenConditioner.ACT_KeepOrigin
+
+        if func.parent.kind == "struct" or (not funcDefinedByLanguage and func.isConstructor()):
+            return CodeGenConditioner.ACT_DefineEmpty
+
+        return CodeGenConditioner.ACT_GenMock
+
+
+class AsfMockConditioner(NormalMockConditioner): #extends NormalMockConditioner
+    def __init__(self): self.projectData = None
+    # def doWhatWithHeader(self, h):    #inherit from parent
+    # def doWhatWithNamespace(self, ns) #inherit from parent
+    def doWhatWitClass(self, cls):
+        if cls.name.endswith("IF"):
+            return CodeGenConditioner.ACT_KeepOrigin
+    def doWhatWithFunction(self, f):
+        if not isinstance(f.parent, Class) or self.doWhatWitClass(f.parent) != CodeGenConditioner.ACT_KeepOrigin:
+            return NormalMockConditioner.doWhatWithFunction(self, f)
+        elif f.isDestructor():
+            return CodeGenConditioner.ACT_DefineEmpty
+        else:
+            return  CodeGenConditioner.ACT_KeepOrigin
+
