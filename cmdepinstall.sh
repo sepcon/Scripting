@@ -45,6 +45,7 @@
  CMDEP_D_INSTALLATION_DIR=~/.local/bin
  CMDEP_D_DATA_DIR=~/.local/dat/cmdep
  CMDEP_F_JUST4LAUGH=${CMDEP_D_DATA_DIR}/just4laugh
+ CMDEP_F_INDEXING_INPROGRESS_SIGNAL=${CMDEP_D_DATA_DIR}/indexing_inprogress_signal
  CMDEP_F_CMLOCAL2SERVER_SCRIPT=$CMDEP_D_INSTALLATION_DIR/cmlocal2server.sh
  CMDEP_F_PYTHON_INDEXER_SCRIPT=${CMDEP_D_DATA_DIR}/pythonindexer.py
  CMDEP_F_DEPLOY_INFORMATION_FILE=$CMDEP_D_DATA_DIR/l2s${CMDEP_N_BRANCH_IDENTIFIER}_DeployInfomation.dat
@@ -333,17 +334,27 @@ __cmdepAddNewPkgFile()
     unset -v CMDEP_V_NOISY_INDEXING
 }
 
+__cmdepGetListFilesFromLstFile() #file.lst .xml
+{
+    local lstFile=$1
+    local pkgExt=$2
+    if [[ -z $1 || -z $2 ]]; then __errorMsg "__cmdepGetListFilesFromLstFile: please specify enough parameters";  __cmdepExit; fi
+    local line
+    while read -r line; do
+        if [[ $line == "#"* ]]; then continue; fi
+        eval "realFile=$line"
+        if [[ -f $realFile ]]; then
+            if [[ $realFile == *."$pkgExt" ]]; then
+                echo $realFile
+            elif [[ $realFile == *.lst ]]; then
+                __cmdepGetListFilesFromLstFile $realFile $pkgExt
+            fi
+        fi
+    done < "$lstFile"
+}
 __cmdepGetExistingPkgFiles()
 {
-    local pkgFilesList=( $( __ignErrRun "cat $CMDEP_F_DEFAULT_PKG_LIST_FILE" ) )
-    for f in ${pkgFilesList[@]}; do
-        eval "realFile=$f"
-        if [[ -e $realFile ]];
-            then printf "$realFile "
-        else
-            __errorMsg "$f does not exist, please specify correct path by command: < cmlocal2server --addconfig=/path/to/pkg/file >"
-        fi
-    done
+    __cmdepGetListFilesFromLstFile $CMDEP_F_DEFAULT_PKG_LIST_FILE xml
 }
 
 # collect the server's information from file CMDEP_F_SETTINGS_FILE
@@ -858,6 +869,29 @@ __cmdepCollectDeployInfo() # isRevert productName1 productName2 ...
         fi
     done
 }
+__cmdepFindStrippedBinaryOf() #$1 = path/to/binary
+{
+    local source=$1 localProductPath=""
+    if [[ $source == *"_stripped_"* && -e $source ]]; then
+        __dbgMsg "using $source as stripped binary"
+    else
+        __msg "Looking for stripped binary of $localProductName ... "
+        if [[ $source == *"out.out" ]]; then
+            local sourceBasePath=${source%/*}
+            localProductPath="${sourceBasePath}/stripped/${localProductName%_out.out}_stripped_out.out"
+            ! [[ -f $localProductPath ]] && __warningMsg "$localProductPath: --> No such file or directory"
+        elif [[ $source == *"so.so" ]]; then
+            local sourceBasePath=${source%/*}
+            localProductPath="${sourceBasePath}/stripped/${localProductName%_so.so}_stripped_so.so"
+            ! [[ -f $localProductPath ]] && __warningMsg "$localProductPath: --> No such file or directory"
+        fi
+    fi
+    if [[ -z $localProductPath ]]; then
+        return $source
+    else
+        return $localProductPath
+    fi
+}
 
 __cmdepDeploy() #serverIP COMPILERENV MODE isRevert <DeployInfo|APP[...]>
 {
@@ -882,7 +916,7 @@ __cmdepDeploy() #serverIP COMPILERENV MODE isRevert <DeployInfo|APP[...]>
         if [[ $rmActionType == copy ]]; then 
             local rmFrom=$2
             local rmTo=$serverAccount:$3
-            scp $rmFrom $rmTo 2> >(__stdErrorMsg)
+            scp $rmFrom $rmTo 2> >(__stdErrorMsg) 
         elif [[ $rmActionType == remote ]]; then
             ( local rmCmd=${@:2}
             ssh $serverAccount "$rmCmd" ) 2> >(__stdErrorMsg)
@@ -914,20 +948,7 @@ __cmdepDeploy() #serverIP COMPILERENV MODE isRevert <DeployInfo|APP[...]>
         if [[ $revert == "false" ]]; then
             localProductName=$(basename $source)
             [[ -z $source ]] && __dbgMsg "__cmdepDeploy_prv_Impl: source is empty"
-            if [[ $source == *"_stripped_"* && -e $source ]]; then
-                __dbgMsg "using $source as stripped binary"
-            else
-                __msg "Looking for stripped binary of $localProductName ... "
-                if [[ $source == *"out.out" ]]; then
-                    local sourceBasePath=${source%/*}
-                    localProductPath="${sourceBasePath}/stripped/${localProductName%_out.out}_stripped_out.out"
-                    ! [[ -f $localProductPath ]] && __warningMsg "$localProductPath: --> No such file or directory"
-                elif [[ $source == *"so.so" ]]; then
-                    local sourceBasePath=${source%/*}
-                    localProductPath="${sourceBasePath}/stripped/${localProductName%_so.so}_stripped_so.so"
-                    ! [[ -f $localProductPath ]] && __warningMsg "$localProductPath: --> No such file or directory"
-                fi
-            fi
+            localProductPath=`__cmdepFindStrippedBinaryOf $source`
             ! [[ -f $localProductPath ]] && localProductPath="$source"
             if [ -e $localProductPath ]; then 
                 serverProductPath=$dest
@@ -939,18 +960,18 @@ __cmdepDeploy() #serverIP COMPILERENV MODE isRevert <DeployInfo|APP[...]>
                 
                 # Make filesystem writable and backup old file here
                 __cmdepDeploy_prv_RemoteExc remote "
-                            echo 'CMLOCAL2SERVER: start working on server'
+                            echo 'SSH: start working on server'
                             rwrfs ;
                             umount /etc/shadow 2>/dev/null
                             cp /etc/shadow_w_root /etc/shadow 2>/dev/null
                             touch /opt/bosch/disable_reset.txt; sync
                             exchnd_ctl --set-sig-config=ESC_RBCM_NORESTART
-                            echo 'CMLOCAL2SERVER: already disabled reset'
+                            echo 'SSH: already disabled reset'
                             export bkext=''
                             if [ -e ${serverProductPath}.ori ]; then
-                                mv $serverProductPath ${serverProductPath}.bak 2>/dev/null && echo -e 'CMLOCAL2SERVER: ${CL_GREEN}RENAMED ${CL_NONE} $serverProductPath to ${serverProductPath}.bak'
+                                mv $serverProductPath ${serverProductPath}.bak 2>/dev/null && echo -e 'SSH: ${CL_GREEN}RENAMED ${CL_NONE} $serverProductPath to ${serverProductPath}.bak'
                             else
-                                mv $serverProductPath ${serverProductPath}.ori 2>/dev/null && echo -e 'CMLOCAL2SERVER: ${CL_GREEN}RENAMED ${CL_NONE} $serverProductPath to ${serverProductPath}.ori'
+                                mv $serverProductPath ${serverProductPath}.ori 2>/dev/null && echo -e 'SSH: ${CL_GREEN}RENAMED ${CL_NONE} $serverProductPath to ${serverProductPath}.ori'
                             fi
                             "
                 [[ $? == $CMDEP_ERROR_CONNECTION_ERROR ]] && return $CMDEP_ERROR_CONNECTION_ERROR
@@ -968,9 +989,9 @@ __cmdepDeploy() #serverIP COMPILERENV MODE isRevert <DeployInfo|APP[...]>
             __msg "--> Trying to revert $serverProductPath ... "
             __cmdepDeploy_prv_RemoteExc remote "rwrfs;
                         if [ -e ${serverProductPath}$revertBakExt ]; then 
-                            rm $serverProductPath; mv ${serverProductPath}$revertBakExt $serverProductPath && echo -e 'CMLOCAL2SERVER: ${CL_GREEN}RENAMED ${CL_NONE} ${serverProductPath}$revertBakExt to $serverProductPath'
+                            rm $serverProductPath; mv ${serverProductPath}$revertBakExt $serverProductPath && echo -e 'SSH: ${CL_GREEN}RENAMED ${CL_NONE} ${serverProductPath}$revertBakExt to $serverProductPath'
                         else
-                            echo -e 'CMLOCAL2SERVER: $CL_ORANGE ${serverProductPath}$revertBakExt does not exist $CL_NONE' >/dev/stderr
+                            echo -e 'SSH: $CL_ORANGE ${serverProductPath}$revertBakExt does not exist $CL_NONE' >/dev/stderr
                             exit $CMDEP_ERROR_REMOTE_COMMAND_ERROR
                         fi
                         " && ((numOfPush++)) && __msg "Revert $serverProductPath done!!!" 
@@ -1050,17 +1071,32 @@ __DEBUG set +x
 
 __cmdepIndexPkgFiles() #$1: deployInfoStorageFile $2: productListStorageFile $3...: pkgFiles
 {
+    touch $CMDEP_F_INDEXING_INPROGRESS_SIGNAL
+    __msg "CMDEPINDEXER: Indexing pkg files ... "
     case $CMDEP_V_TOOL_FOR_INDEXING in
     "awk")
-        __cmdepIndexPkgFilesUsingAwk $@
+        (
+            __cmdepIndexPkgFilesUsingAwk $@
+            rm $CMDEP_F_INDEXING_INPROGRESS_SIGNAL
+        ) &
         ;;
     "python")
-        __cmdepIndexPkgFilesUsingPython $@
+        (
+            __cmdepIndexPkgFilesUsingPython $@
+            rm $CMDEP_F_INDEXING_INPROGRESS_SIGNAL
+        ) &
         ;;
     *)
+        rm $CMDEP_F_INDEXING_INPROGRESS_SIGNAL
         __errorMsg "Indexing facility is not specified please set CMDEP_V_TOOL_FOR_INDEXING = python|awk "
         ;;
      esac
+     
+     while [[ -f $CMDEP_F_INDEXING_INPROGRESS_SIGNAL ]]; do
+        printf "..."
+        sleep 1
+     done 
+     __msg "\nCMDEPINDEXER: Indexing DONE!!!"
 }
 __cmdepIndexPkgFilesUsingPython() #$1: deployInfoStorageFile $2: productListStorageFile $3...: pkgFiles
 {
@@ -1487,7 +1523,7 @@ __cmdepl2sMainComp()
     
     [[ -n $COMPREPLY ]] && return
     
-    if [[ -z $COMPREPLY ]]; then
+    if [[ $cur != "-"* ]]; then
 #     __cmdepMakeEnvVarsAsStringLiteral
         local _SWNAVIROOT='${_SWNAVIROOT}' COMPILERENV='${COMPILERENV}'  MODE='${MODE}' _SWBUILDROOT='${_SWBUILDROOT}'
         local WILLREPLY=()
@@ -1607,10 +1643,7 @@ else
     echo 'export CMDEP_V_SUPPORTED_TYPES="\\.so|\\.bin|\\.out"' > $CMDEP_F_SUPPORTED_TYPES_FILE
     
 # Predefined pkg files to collect the deployment information
-    echo '
-        ${_SWROOT}/ai_sds_adapter/adapter/config/packages/pkg_sds_adapter.xml
-        ${_SWROOT}/ai_nissan_hmi/config/packages/pkg_nissan_hmi.xml
-        ${_SWROOT}/ai_hmi_base/config/packages/pkg_hmicgi.xml' >> $CMDEP_F_DEFAULT_PKG_LIST_FILE
+    echo '${_SWNAVIROOT}/config/packages/pkg_filelist.lst' >> $CMDEP_F_DEFAULT_PKG_LIST_FILE
     
 
 # IMPORTANT!!!!

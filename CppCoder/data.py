@@ -80,7 +80,7 @@ class Function(HasTypeMember):
     def isDestructor(self):
         return isinstance(self.parent, Class) and self.name.find("~") != -1
     def getReturnType(self):
-        if self.virtualType != "no-virtual":
+        if self.virtualType != "non-virtual":
             return "virtual " + self.type
         else:
             return self.type

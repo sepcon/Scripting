@@ -64,7 +64,7 @@ class GmockCodeGentor(ICodeGentor):
             if hasattr(self, "_globalMockClassInstance"): del self._globalMockClassInstance
             self.nonClassFunctionList = []
             self.header = None
-    def __init__(self, projectData, outdir, conditionerType = CodeGenConditioner.TYPE_NormalMock):
+    def __init__(self, projectData, outdir, conditionerType = CodeGenConditioner.TYPE_Asf):
         assert (projectData == None or isinstance(projectData, Project))
         self.projectData = projectData
         self.outdir = outdir
@@ -275,10 +275,9 @@ class GmockCodeGentor(ICodeGentor):
         if action == CodeGenConditioner.ACT_Ignore:
             return
         elif action == CodeGenConditioner.ACT_DefineEmpty:
-
-            self._activeCodeWriter.writeln(func.getReturnType() + func.name + func.argsstring + "{}")
+            self._activeCodeWriter.writeln(" ".join([ func.getReturnType(), func.name, func.argsstring, "{}" ] ))
         elif action == CodeGenConditioner.ACT_KeepOrigin:
-            self._activeCodeWriter.writeln(func.getReturnType() + func.name + func.argsstring + ";")
+            self._activeCodeWriter.writeln(" ".join([ func.getReturnType(), func.name, func.argsstring, ";" ] ))
         else: #action == CodeGenConditioner.ACT_GenMock
             if func.hasDefaultParam():
                 self.__4f_createMockMethodWithDefaultParam(func)
@@ -361,8 +360,9 @@ class NormalMockConditioner(CodeGenConditioner):
         funcDefinedByLanguage = re.match("\(.*\)\s*=", func.argsstring) != None and not func.isPureVirtual()
         if funcDefinedByLanguage:
             return CodeGenConditioner.ACT_KeepOrigin
-
-        if func.parent.kind == "struct" or (not funcDefinedByLanguage and func.isConstructor()):
+        elif func.isConstructor():
+            return CodeGenConditioner.ACT_Ignore
+        if func.parent.kind == "struct":
             return CodeGenConditioner.ACT_DefineEmpty
 
         return CodeGenConditioner.ACT_GenMock
