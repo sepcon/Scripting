@@ -437,6 +437,18 @@ __cmdepBuildProduct() # $1: buildmode $2: MODE $3: COMPILERENV productList
     return $?
 }
 
+# This function prints out platform specific command to disable signal handler
+__cmdepRD_prv_GetDisableExeptionHandlerCommand()
+{
+    local platform=bosch #TBD: this will be determined at installation time, by specify platform as script parameter and store in configuration
+    case $platform in
+        bosch) # This is for bosch-cm
+            echo 'systemctl stop exception-handler'
+            ;;
+        *)
+            echo ""
+    esac
+}
 
 __cmdepRemoteDebug() # 1.path/to/gdbinit 2.path/to/server/product 3.serverIP 4.port=2345
 {
@@ -450,7 +462,7 @@ __cmdepRemoteDebug() # 1.path/to/gdbinit 2.path/to/server/product 3.serverIP 4.p
         if [[ -z \$pid ]]; then 
             echo -e \"${CL_RED}Error: the $product is not running, please reboot the server and try aggain${CL_NONE}\";
         else
-            exchnd_ctl --set-sig SIGTRAP;
+            `__cmdepRD_prv_GetDisableExeptionHandlerCommand`;
             gdbserver :$port --attach \$pid;
         fi"
     if [[ $gdbinitPath != "#" && -e $gdbinitPath ]]; then 
