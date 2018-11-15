@@ -40,7 +40,7 @@
  CMDEP_ERROR_WRONG_ARGUMENT=5
 #-----------------------------
 ## Global variable definitions
- CMDEP_V_TOOL_FOR_INDEXING=python
+ CMDEP_V_TOOL_FOR_INDEXING=python #you can change this value to 'awk' to experience index by awk
  CMDEP_N_BRANCH_IDENTIFIER=${_SWROOT//\//_}
  CMDEP_D_INSTALLATION_DIR=~/.local/bin
  CMDEP_D_DATA_DIR=~/.local/dat/cmdep
@@ -641,7 +641,7 @@ __cmdepl2sMain()
     __cmdepAssertBuildEnv
     __clearAllGlobalVariables # Making sure that all variables will be set below won't be available until they are really set
     __cmdepStartErrorCounting
-    
+    set +m
     local productList=()
     local revertBakExt=.ori
     
@@ -871,11 +871,14 @@ __cmdepCollectDeployInfo() # isRevert productName1 productName2 ...
 }
 __cmdepFindStrippedBinaryOf() #$1 = path/to/binary
 {
-    local source=$1 localProductPath=""
+    #**
+    # WARNING: do not allow to __msg or echo some message here to std::out
+    # This function just allow to echo the path to binary name only
+    #**
+    local source=$1 localProductPath="" localProductName=`basename $source`
     if [[ $source == *"_stripped_"* && -e $source ]]; then
         __dbgMsg "using $source as stripped binary"
     else
-        __msg "Looking for stripped binary of $localProductName ... "
         if [[ $source == *"out.out" ]]; then
             local sourceBasePath=${source%/*}
             localProductPath="${sourceBasePath}/stripped/${localProductName%_out.out}_stripped_out.out"
@@ -887,9 +890,9 @@ __cmdepFindStrippedBinaryOf() #$1 = path/to/binary
         fi
     fi
     if [[ -z $localProductPath ]]; then
-        return $source
+        echo $source
     else
-        return $localProductPath
+        echo $localProductPath
     fi
 }
 
@@ -948,6 +951,7 @@ __cmdepDeploy() #serverIP COMPILERENV MODE isRevert <DeployInfo|APP[...]>
         if [[ $revert == "false" ]]; then
             localProductName=$(basename $source)
             [[ -z $source ]] && __dbgMsg "__cmdepDeploy_prv_Impl: source is empty"
+            __msg "Looking for stripped binary of $localProductName ... "
             localProductPath=`__cmdepFindStrippedBinaryOf $source`
             ! [[ -f $localProductPath ]] && localProductPath="$source"
             if [ -e $localProductPath ]; then 
@@ -1072,7 +1076,9 @@ __DEBUG set +x
 __cmdepIndexPkgFiles() #$1: deployInfoStorageFile $2: productListStorageFile $3...: pkgFiles
 {
     touch $CMDEP_F_INDEXING_INPROGRESS_SIGNAL
-    __msg "CMDEPINDEXER: Indexing pkg files ... "
+    __msg "CMDEPINDEXER: Indexing pkg files"
+    
+    set +m # Turn off bash monitor mode
     case $CMDEP_V_TOOL_FOR_INDEXING in
     "awk")
         (
@@ -1091,12 +1097,12 @@ __cmdepIndexPkgFiles() #$1: deployInfoStorageFile $2: productListStorageFile $3.
         __errorMsg "Indexing facility is not specified please set CMDEP_V_TOOL_FOR_INDEXING = python|awk "
         ;;
      esac
-     
      while [[ -f $CMDEP_F_INDEXING_INPROGRESS_SIGNAL ]]; do
-        printf "..."
-        sleep 1
+        printf "."
+        sleep 0.05
      done 
      __msg "\nCMDEPINDEXER: Indexing DONE!!!"
+     set -m
 }
 __cmdepIndexPkgFilesUsingPython() #$1: deployInfoStorageFile $2: productListStorageFile $3...: pkgFiles
 {
@@ -1553,9 +1559,10 @@ __cmdepCreateBuildProductAliases()
 }
 
 #     Index the config files to get the hints for command completion
-if [[ $0 == "bash" ]]; then
+if [[ $0 == *"bash" || $0 == *"/sh" ]]; then
      __cmdepIndexStoredPkgFiles
      alias cmlocal2server=__cmdepl2sMain
+     complete -F __cmdepCompleteBuildProductCmd buildproduct 
      complete -o default -F __cmdepl2sMainComp cmlocal2server 
      eval "$( awk ' !/^#|^[[:space:]]*$/ {
                                 print "alias bldprdsrc" $1 "=\"buildproduct --os=" $3 " --env=" $4 " --buildmode=build --mode=" $5 " --alldeps=none --noprecreate --info --silent\" "
@@ -1754,7 +1761,7 @@ def tryCollectMatchingFilesWithFilter(source, filter):
         source = source.replace("gen3x86make", "gen3armmake")
         matchedFiles += filesMatch(source, filter)
     if len(matchedFiles) == 0:
-        verboseMsg("Dont found anything with folder " + source + " and filter = " + filter)
+        verboseMsg("Found nothing with folder " + source + " and filter = " + filter)
     return matchedFiles
 
 
@@ -1884,4 +1891,5 @@ echo '
     echo -e "Please type: ${CL_GREEN}source $CMDEP_F_CMLOCAL2SERVER_SCRIPT${CL_NONE} to use ${CL_GREEN}cmlocal2server${CL_NONE}"
     
 fi
+#EOF
 ##############################################################################################################
