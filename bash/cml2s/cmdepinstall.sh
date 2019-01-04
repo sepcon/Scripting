@@ -31,6 +31,10 @@
 # CMDEP_D_ --> # directory
 # CMDEP_F_ --> # file
 #------------------------------
+[[ ! -v _SWNAVIROOT ]] && export _SWNAVIROOT=/data2/cgo1hc/samba/views/nincg3/ai_projects
+[[ ! -v _SWBUILDROOT ]] && export _SWBUILDROOT=/home/cgo1hc/samba/views/nincg3_GEN/ai_projects
+[[ ! -v _SWBUILDROOT ]] && export _SWBUILDROOT=/data2/cgo1hc/samba/views/nincg3/di_misc_tools
+
 ## Error code definitions
  CMDEP_ERROR_OK=0
  CMDEP_ERROR_FILE_NOT_FOUND=1
@@ -39,19 +43,15 @@
  CMDEP_ERROR_FILE_UNSUPPORTED=4
  CMDEP_ERROR_WRONG_ARGUMENT=5
 #-----------------------------
-## Global variable definitions
+## Global information
+# `-->
  CMDEP_V_TOOL_FOR_INDEXING=python #you can change this value to 'awk' to experience index by awk
- CMDEP_N_BRANCH_IDENTIFIER=${_SWROOT//\//_}
  CMDEP_D_INSTALLATION_DIR=~/.local/bin
  CMDEP_D_DATA_DIR=~/.local/dat/cmdep
  CMDEP_F_JUST4LAUGH=${CMDEP_D_DATA_DIR}/just4laugh
  CMDEP_F_INDEXING_INPROGRESS_SIGNAL=${CMDEP_D_DATA_DIR}/indexing_inprogress_signal
  CMDEP_F_CMLOCAL2SERVER_SCRIPT=$CMDEP_D_INSTALLATION_DIR/cmlocal2server.sh
  CMDEP_F_PYTHON_INDEXER_SCRIPT=${CMDEP_D_DATA_DIR}/pythonindexer.py
- CMDEP_F_DEPLOY_INFORMATION_FILE=$CMDEP_D_DATA_DIR/l2s${CMDEP_N_BRANCH_IDENTIFIER}_DeployInfomation.dat
- CMDEP_F_PRODUCT_LIST_FILE=$CMDEP_D_DATA_DIR/l2s${CMDEP_N_BRANCH_IDENTIFIER}_ProductList.dat
- CMDEP_F_LAST_MODES_FILE=$CMDEP_D_DATA_DIR/l2s${CMDEP_N_BRANCH_IDENTIFIER}_LastModes.dat
- CMDEP_F_CUSTOM_DEPLOY_INFO_FILE=$CMDEP_D_DATA_DIR/l2s${CMDEP_N_BRANCH_IDENTIFIER}_CustomPkgFiles.dat
  CMDEP_F_DEFAULT_PKG_LIST_FILE=$CMDEP_D_DATA_DIR/l2s_DefaultPkgFiles.dat
  CMDEP_F_SETTINGS_FILE=$CMDEP_D_DATA_DIR/l2s_serversSettings.dat
  CMDEP_F_SUPPORTED_TYPES_FILE=$CMDEP_D_DATA_DIR/l2s_supportedTypes.dat
@@ -61,6 +61,18 @@
  CMDEP_N_GDBINIT=gdbinit
  CMDEP_N_RFS=';' #field separator --> dest=path/to/dest;source=dest/to/source --> useful for calling eval in bash, we can get both variables dest and source
  [[ -e $CMDEP_F_SUPPORTED_TYPES_FILE ]] && source $CMDEP_F_SUPPORTED_TYPES_FILE
+# <--,
+## Branch specific information
+# `-->
+ CMDEP_N_BRANCH_IDENTIFIER=l2s_${_SWROOT//\//_}
+ CMDEP_D_CURRENT_BRANCH_DATA_DIR=${CMDEP_D_DATA_DIR}/branches/${CMDEP_N_BRANCH_IDENTIFIER}
+    [[ ! -d $CMDEP_D_CURRENT_BRANCH_DATA_DIR ]] && mkdir -p $CMDEP_D_CURRENT_BRANCH_DATA_DIR
+ CMDEP_F_DEPLOY_INFORMATION_FILE=${CMDEP_D_CURRENT_BRANCH_DATA_DIR}/DeployInfomation.dat
+ CMDEP_F_PRODUCT_LIST_FILE=${CMDEP_D_CURRENT_BRANCH_DATA_DIR}/ProductList.dat
+ CMDEP_F_LAST_MODES_FILE=${CMDEP_D_CURRENT_BRANCH_DATA_DIR}/LastModes.dat
+ CMDEP_F_CUSTOM_DEPLOY_INFO_FILE=${CMDEP_D_CURRENT_BRANCH_DATA_DIR}/CustomPkgFiles.dat
+# <--,
+
 #----------------------
 ## Printing variables
  CL_RED='\033[0;31m'
@@ -74,20 +86,6 @@
  CMDEP_V_COMP_PREVIOUS_COMPREPLY=
 ## Function definitions
 #
-
-__just4Laugh()
-{
-    if [[ -e $CMDEP_F_JUST4LAUGH  ]]; then
-      __redMsg "Con is very handsome, right"
-      __msg "if you don't feel that, please type: ConIsNotHandsome"
-    fi
-}
-
-ConIsNotHandsome()
-{
-    rm $CMDEP_F_JUST4LAUGH 2>/dev/null
-    __redMsg "Thanks for your response, but I really hate you!!! :@"
-}
 
 __DEBUG()
 {
@@ -173,7 +171,7 @@ __cmdepReportErrorCount()
 __cmdepExit()
 {
     __cmdepReportErrorCount "$@"
-    kill -SIGINT $$
+    kill -INT $$
 }
 
 __cmdepPrintBuildProductHelp()
@@ -193,7 +191,7 @@ __cmdepPrintCommandsHelp() #option
     __msg "Copy/Revert list of binary files that specified in pkg_XXX_.xml files from local to server, or debug the application from remote serever"
     __msg "Make sure you are executing the command in build environment and execute the command '${CL_GREEN}source ~/.bashrc${CL_NONE}' to load the commands in case cmlocal2server command is not available after set_env.sh script is run"
     __msg
-    __msg "    cmlocal2server [--mode=<debug|release>] [--server=<target|lsim>]  [--noreboot] [--build=<build|rebuild|noprecreate>]  PRODUCT1 PRODUCT2 ... PRODUCTN"
+    __msg "    cmlocal2server [--mode=<debug|release>] [--server=<`__cmdepGetListOfServerNames \|`>]  [--noreboot] [--build=<build|rebuild|noprecreate>]  PRODUCT1 PRODUCT2 ... PRODUCTN"
     __msg "        ---> : look up for AppXX name in configuration files and copy to server"
     __msg "    cmlocal2server --revert=[.backupExtension] [--noreboot] PRODUCT1 PRODUCT2 ... PRODUCTN" 
     __msg "        ---> : Revert products in list to backup version with .backupExtension(default = .ori)"
@@ -562,7 +560,7 @@ __cmdepStartObservationMode() #$1:observationfile $2:actionFunction
             {
                 __ignErrRun rm $observedFile 
                 __msg "Stopped observation on file $observedFile"
-                exit
+                __cmdepExit
             }; trap __cmdepStartObservationMode_prv_OnTerminated SIGHUP SIGINT SIGTERM
             
             while true; do
@@ -656,7 +654,7 @@ __cmdepl2sMain()
     set +m
     local productList=()
     local revertBakExt=.ori
-    
+  
     __cmdepl2sArgsCheck() #$1: arg
     {
         local arg=$1
@@ -917,6 +915,7 @@ __cmdepDeploy() #serverIP COMPILERENV MODE isRevert <DeployInfo|APP[...]>
     local cpCommand=scp
     local numOfPush=0
     local allDeployInfo
+    set +e 
     __DEBUG set -x
     if ((binsCount == 0)); then
         local hlpopt="#" ; [[ $revert == "true" ]] && hlpopt="revert"
@@ -1391,7 +1390,7 @@ __cmdepUninstall()
     unset -v  CMDEP_F_CMLOCAL2SERVER_SCRIPT CMDEP_F_CUSTOM_DEPLOY_INFO_FILE CMDEP_F_SETTINGS_FILE CMDEP_F_SUPPORTED_TYPES_FILE CMDEP_F_RUNNING_OBSERVATION_PROCESS  
     unset -v CMDEP_D_DATA_DIR CMDEP_D_INSTALLATION_DIR CMDEPDEBUG __updateself cmdepInsScriptName CMDEP_N_BRANCH_IDENTIFIER  
     unset -v CMDEP_F_DEPLOY_INFORMATION_FILE CMDEP_F_PRODUCT_LIST_FILE CMDEP_F_LAST_MODES_FILE CMDEP_F_DEFAULT_PKG_LIST_FILE CMDEP_V_SUPPORTED_TYPES CMDEP_V_TOOL_FOR_INDEXING
-    unset -f __DEBUG __msg __redMsg __dbgMsg __errorMsg __warningMsg __stdErrorMsg __separatedRegion
+    unset -f __DEBUG __msg __redMsg __dbgMsg __errorMsg __warningMsg __stdErrorMsg __separatedRegion __cmdepGetListOfServerNames
     unset -f __cmdepExit __cmdepl2sMain __cmdepDeploy_prv_Impl __cmdepIndexPkgFiles __cmdepIndexPkgFilesUsingPython __cmdepIndexPkgFilesUsingAwk __cmdepIndexStoredPkgFiles __cmdepUninstall __cmdepCompleteProductName __cmdepStopObservationMode
     unset -f __cmdepHelp __cmdepErrorAndHelp __cmdepPrintCommandsHelp __cmdepCompleteBuildProductCmd __cmdepl2sMainComp __cmdepInstallHelp __cmdepStartObservationMode
     unset -f __cmdepMakeEnvVarsAsStringLiteral __cmdepUndoMakingEnvVarsAsStringLiteral __cmdepAssertBuildEnv __cmdepWildcard2Regex __cmdepRememberPkgFiles __cmdepAddNewPkgFile __cmdepGetExistingPkgFiles  __cmdepDeploy_prv_RemoteExc __cmdepGetServerInformation
@@ -1437,6 +1436,14 @@ __cmdepMapToPathOnServer() #source
     done
     unset -v source dest
 }
+
+__cmdepGetListOfServerNames() #$1:delimiter
+{
+    local delim=$1
+    [[ -z $delim ]] && delim=' '
+    [[ -f $CMDEP_F_SETTINGS_FILE ]] && echo $(awk -v delim="$delim" ' !/^#|^[[:space:]]*$/  { printf($1 delim) } ' $CMDEP_F_SETTINGS_FILE )
+}
+
 __cmdepl2sMainComp() 
 {
     __cmdepl2sMainComp_prv_Set_COMPREPLY()
@@ -1448,7 +1455,7 @@ __cmdepl2sMainComp()
     
     local cur prev words cword
     local modes='release debug'
-    local servers=$(awk ' !/^#|^[[:space:]]*$/ { print $1 } ' $CMDEP_F_SETTINGS_FILE )
+    local servers=`__cmdepGetListOfServerNames`
     local buildmodes='rebuild build noprecreate'
     local observeactions="off $_SWROOT/ai_nissan_hmi/products/NINCG3/Apps/"
     local helps="altsource altdest mode server addconfig build noreboot revert reindex uninstall save debug port newtype changeSettings observe"
@@ -1477,7 +1484,7 @@ __cmdepl2sMainComp()
     COMPREPLY=()
     
     #just print out previous completion
-    [[ $COMP_TYPE == 63 ]]  && COMPREPLY=( ${CMDEP_V_COMP_PREVIOUS_COMPREPLY[@]}) && return
+#     [[ $COMP_TYPE == 63 ]]  && COMPREPLY=( ${CMDEP_V_COMP_PREVIOUS_COMPREPLY[@]}) && return
     
     if [[ $cur == "=" ]]; then
         cur=""

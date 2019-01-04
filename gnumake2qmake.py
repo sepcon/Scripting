@@ -74,29 +74,29 @@ class ContenWriter:
     FILE_DEVICE=2
 
     @staticmethod
-    def setDirection(to):
+    def redirect(to):
         if to == ContenWriter.CONSOLE_DEVICE:
-            ContenWriter.__impl = ContenWriter.ConsoleWriter()
+            ContenWriter.__impl = ContenWriter.__ConsoleWriter()
         else:
-            ContenWriter.__impl = ContenWriter.FileWriter()
+            ContenWriter.__impl = ContenWriter.__FileWriter()
 
     @staticmethod
     def write(dir, name, content):
         if ContenWriter.__impl == None:
             Logger.info("Warning: output direction is not specified, then write to file")
-            ContenWriter.__impl = ContenWriter.FileWriter
+            ContenWriter.__impl = ContenWriter.__FileWriter
         ContenWriter.__impl.write(dir, name, content)
 
     # The private implementers
     __impl = None
-    class ConsoleWriter:
+    class __ConsoleWriter:
         def write(self, dir, name, content):
             name = dir + os.sep + name + ".pro"
             Logger.verbose("START: =============== " + name + " =================")
             Logger.verbose(content)
             Logger.verbose("END: ===============" + name + ".pro=================")
 
-    class FileWriter:
+    class __FileWriter:
         def write(self, dir, name, content):
             if not os.path.exists(dir):
                 os.makedirs(dir)
@@ -108,8 +108,8 @@ class ContenWriter:
 
 class GnumakeProjectChooser:
     def __init__(self):
-        self.project = None
-        self.variantList = [ 'inf4cv', 'aivi', 'rnaivi', 'rnaivi2', 'aivi_tts', 'rivie']
+        self.__variantList = [ 'inf4cv', 'aivi', 'rnaivi', 'rnaivi2', 'aivi_tts', 'rivie']
+        self._selectedBuildMode = self.__toGnumakeMode(Project.Instance().args.mode)
 
     # buildable when dir contains gnumake file
     def buildable(self, dir):
@@ -127,23 +127,23 @@ class GnumakeProjectChooser:
     def __shouldParse(self, dir):
         self.__complainNullProject()
         should = True
-        mode = self.__toGnumakeMode(self.project.args.mode)
-        if not dir.endswith(mode):
+        if not dir.endswith(self._selectedBuildMode):
             should = False
-        elif dir.rfind(self.project.args.variant) == -1:
-            for v in self.variantList:
+        elif dir.rfind(Project.Instance().args.variant) == -1:
+            for v in self.__variantList:
                 if v in dir:
                     should = False;
                     break;
         else:
             should = True
             # matches = 0
-            # for v in self.variantList:
+            # for v in self.__variantList:
             #     if v in dir:
             #         matches += 1
             #         if matches > 1:
             #             should = False
             #             break
+
         return should
 
     def __toGnumakeMode(self, mode):
@@ -153,7 +153,7 @@ class GnumakeProjectChooser:
             return "_d"
 
     def __complainNullProject(self):
-        if self.project == None:
+        if Project.Instance() == None:
             raise Exception("This chooser is not being tied to any project, please set one")
 
 #############################################################################################################################
@@ -161,12 +161,28 @@ class GnumakeProjectChooser:
 #############################################################################################################################
 class ProjectChooserFactory:
     @staticmethod
-    def createChooser(type):
+    def create(type):
         if type == "gnumake":
             return GnumakeProjectChooser()
         else:
             # With other build system, who will implement?
             return GnumakeProjectChooser()
+
+class ParserFactory:
+    @staticmethod
+    def create(type):
+        if type == "gnumake":
+            return GnumakeParser()
+        else:
+            return None
+
+class GeneratorFactory:
+    @staticmethod
+    def create(type):
+        if type == "qmake":
+            return QmakeGenerator()
+        else:
+            return  None
 
 class ProjectArguments:
     def __init__(self):
@@ -188,10 +204,11 @@ class ProjectArguments:
             self.outDevice = ContenWriter.CONSOLE_DEVICE
 
     def parseArgs(self):
-        argParser = argparse.ArgumentParser( 'python gnumake2qmake.py -o path/to/qmake-projects -vr variant path/to/dir/contains/gnumake-projects', description='\n\n\tSimply conversion from makefile to qmake file for investigating source code with qtcreator')
+        argParser = argparse.ArgumentParser( 'python gnumake2qmake.py -o path/to/qmake-projects --variant=VARIANT path/to/dir/contains/gnumake-projects',
+                                             description='\n\n\tSimply conversion from makefile to qmake file for investigating source code with qtcreator')
         argParser.add_argument('gnumakepath', help='path to directory that contains gnumake projects')
         argParser.add_argument('-o', '--outdir', default='.', help='directory for storing qmake file output')
-        argParser.add_argument('-t', '--variant', default='aivi', help='project variant: rnaivi | rnaivi2 | aivi_tts | rivie')
+        argParser.add_argument('-t', '--variant', help='project variant: rnaivi | rnaivi2 | aivi_tts | rivie')
         argParser.add_argument('-v', "--verbose", help='print all message as details', action='store_true')
         argParser.add_argument('-m', "--mode", default='release', help='release | debug')
         argParser.add_argument('-d', "--outdevice", default='file', help='write output to file or console, default is write to file. i.e: -o console|file')
@@ -224,21 +241,44 @@ class ProjectArguments:
                    dbReplacement, vbReplacement)
 
 class Project:
-    def __init__(self, projectType):
-        self.args = ProjectArguments()
-        Logger.initialize(self.args.verbose)
-        ContenWriter.setDirection(to=self.args.outDevice)
-        self.chooser = ProjectChooserFactory.createChooser(projectType)
-        self.chooser.project = self
+    __instance = None
+    @staticmethod
+    def Instance():
+        if Project.__instance == None:
+            raise Exception("Please invoke Project.Init(srcType, destType) first")
+        else:
+            return Project.__instance
 
-    def genQmake(self):
+    @staticmethod
+    def Init():
+        Project.__instance = Project()
+        # TBD: srcType and destType must be specified vi commandline arguments when you want to extend the script to parse from other kinds of workspace and generate other kinds of workspace
+        # like cmake or build database ...
+        srcType = "gnumake"
+        destType = "qmake"
+        Logger.initialize(Project.__instance.args.verbose)
+        ContenWriter.redirect(to=Project.__instance.args.outDevice)
+        Project.__instance.chooser = ProjectChooserFactory.create(srcType)
+        Project.__instance.generator = GeneratorFactory.create(destType)
+        Project.__instance.parser = ParserFactory.create(srcType)
+        return Project.__instance
+
+    def __init__(self):
+        if(Project.__instance != None):
+            raise Exception("Cannot create multiple instance of Project class, please use Project.instance")
+        self.args = ProjectArguments()
+
+
+
+    def genTarget(self):
         treeNode = self.__formPrjTree(self.args.gnumakepath)
         if self.args.debugscript == True:
             treeNode.dumpTreeData()
         else:
-            projectName = treeNode.genQmake()
+            self.parser.setNode(treeNode).parse()
+            projectName = self.generator.setNode(treeNode).genTarget() # projectName will be the root project in case of multiple sub-projects
             if projectName.strip() != "":
-                self.__genRefreshCommand()
+                self.__generateUtilsScripts()
                 Logger.info("Root Project " + projectName + " has been created!")
             else:
                 Logger.info("This directory does not contain any things match with the input arguments")
@@ -247,7 +287,7 @@ class Project:
     def __formPrjTree(self, currentWorkingDir, parentNode=None):
         treeNode = None
         if self.chooser.buildable(currentWorkingDir):
-            treeNode = BuildNode(self, currentWorkingDir, parentNode)
+            treeNode = BuildNode(currentWorkingDir, parentNode)
         else:
             filesInPath = os.listdir(currentWorkingDir)
             if len(filesInPath) > 0:
@@ -257,29 +297,45 @@ class Project:
                     if os.path.isdir(absFile):
                         subdirs.append(absFile)
                 if len(subdirs) > 0:
-                    treeNode = DirNode(self, currentWorkingDir, parentNode)
+                    treeNode = DirNode(currentWorkingDir, parentNode)
                     for subdir in subdirs:
                         subTree = self.__formPrjTree(subdir, treeNode)
                         if subTree != None and subTree.usable():
                             treeNode.addChild(subTree)
         return treeNode
 
-    def __genRefreshCommand(self):
+    def __generateUtilsScripts(self):
+        self.__generateRefreshScript()
+        self.__genGuruScript()
+
+    def __generateRefreshScript(self):
         ContenWriter.write(self.args.outdir, "refresh.sh", self.args.reformShellCommand())
         refreshPath = os.path.join(self.args.outdir, "refresh.sh")
         os.chmod(refreshPath, 0755)
 
+    def __genGuruScript(self):
+        scriptName = "findProjectOf.sh"
+        Logger.info("Write file " + scriptName)
+        command = """
+            #!/bin/bash
+            searchFile=$1
+            [[ -z $searchFile ]] && echo 'Please specify a file name' && exit
+            grep $searchFile -ril --include=*.pro {0}
+        """.format(self.args.outdir)
+        ContenWriter.write(self.args.outdir, scriptName, command)
+        os.chmod(os.path.join(self.args.outdir, scriptName), 0755)
+
+
 class DirNode:
-    def __init__(self, project, dir=".", parentNode = None):
-        self.project = project
+    def __init__(self, dir=".", parentNode = None):
         self.childList = []
         self.dir = os.path.abspath(dir)
         self.parentNode = parentNode
         if parentNode != None:
             self.outdir = os.path.join(parentNode.outdir, self.getNodeName())
         else:
-            self.outdir = project.args.outdir
-        self.level = self.calculateLevel()
+            self.outdir = Project.Instance().args.outdir
+        self.level = self.__calculateLevel()
 
     def info(self, message):
         Logger.info(message, self.level)
@@ -297,41 +353,12 @@ class DirNode:
         else:
             self.info(self.getNodeName() + " -- B")
 
-    def genQmake(self):
-        prjName = ""
-        self.verbose("Start parsing: " + self.getNodeName() + " ---> ")
-        self.createOutDir()
-        if self.hasChild():
-            childPrjList = []
-            for childNode in self.childList:
-                if childNode == None:
-                    continue
-                childPrjName = childNode.genQmake()
-                if childPrjName != "":
-                    childPrjList.append(childNode)
-            if len(childPrjList) > 0:
-                prjName = self.getNodeName()
-                ContenWriter.write(self.outdir, prjName + ".pro", self.createQmakeContent(childPrjList))
-        self.verbose( "Parsing done: " + self.getNodeName() + " <--- ")
-        if prjName != "":
-            self.info("--> Project: " + prjName + " created")
-        return prjName
-
-    def createQmakeContent(self, childPrjList):
-        mainContent = "SUBDIRS = "
-        for child in childPrjList:
-            mainContent += child.getNodeName() + " \\\n"
-        return QMAKE_FILE_TEMPLATE_SUBDIRS + mainContent
-
     def createOutDir(self):
         if not os.path.exists(self.outdir):
             os.makedirs(self.outdir)
 
     def getNodeName(self):
         return FSUtill.baseName(self.dir)
-
-    def usable(self):
-        return self.hasChild()
 
     def hasChild(self):
         return len(self.childList) > 0
@@ -345,7 +372,7 @@ class DirNode:
         except ValueError:
             self.info("There no child node: " + node)
 
-    def calculateLevel(self):
+    def __calculateLevel(self):
         i = 0
         parent = self.parentNode
         while parent != None:
@@ -353,54 +380,12 @@ class DirNode:
             parent = parent.parentNode
         return i
 
+    def usable(self):
+        return self.hasChild()
 
 class BuildNode(DirNode):
-    def __init__(self, project, dir=".", parentNode=None):
-        DirNode.__init__(self, project, dir, parentNode)
-
-    def usable(self):
-        return True
-
-    def genQmake(self):
-        self.verbose("PARSING START: " + self.getNodeName())
-        prjName = ""
-        if not self.project.chooser.choose(self.dir):
-            self.verbose("don't parse " + self.dir)
-            prjName = ""
-        else:
-            parser = GnumakeParser(self)
-            self.verbose("START: Parsing gnumake file...")
-            parser.parse()
-            qmakeContent = self.createQmakeContent(parser)
-            if qmakeContent != "":
-                prjName = self.getNodeName()
-                ContenWriter.write(self.outdir, prjName + ".pro", qmakeContent)
-            else:
-                self.info(self.getNodeName() + " ----> EMPTY!!!")
-
-        self.verbose( "PARSING DONE: " + self.getNodeName())
-        if prjName != "":
-            self.info(" --> Created sub project: " + prjName)
-        return prjName
-
-    def createQmakeContent(self, parser):
-        if parser.hasData():
-            return QMAKE_FILE_TEMPLATE_APP + \
-                   QMAKE_CC + parser.cc + QMAKE_LINE_BREAKS + \
-                   QMAKE_CXX + parser.cxx + QMAKE_LINE_BREAKS + \
-                   QMAKE_CFLAGS + parser.cflags + QMAKE_LINE_BREAKS + \
-                   QMAKE_CXXFLAGS + parser.cxxflags + QMAKE_LINE_BREAKS + \
-                   QMAKE_DEBUGGER + parser.dbger + QMAKE_LINE_BREAKS + \
-                   QMAKE_MACROS_DEFINE_KEYWORD + parser.defines + QMAKE_LINE_BREAKS + \
-                   QMAKE_INCLUDEPATH_KEYWORD + parser.includePaths + QMAKE_LINE_BREAKS + \
-                   QMAKE_SOURCE_KEYWORD + parser.cppFiles
-        else:
-            return ""
-
-
-class GnumakeParser:
-    def __init__(self, node):
-        self.node = node
+    def __init__(self, dir=".", parentNode=None):
+        DirNode.__init__(self, dir, parentNode)
         self.includePaths = ""
         self.defines = ""
         self.cflags = ""
@@ -409,34 +394,151 @@ class GnumakeParser:
         self.cc = ""
         self.cxx = ""
         self.dbger = ""
-        self.workingDir = node.dir
         self.parsed = False
 
-    def hasData(self):
-        if not self.parsed:
-            raise Exception(self.workingDir + " hasn't been parsed yet!")
-        return self.defines != "" or self.cflags != "" or self.cxxflags != "" or self.cppFiles != "" or self.workingDir != ""
+    def usable(self):
+        return True
 
-    def setWorkingDir(self, dir):
-        self.workingDir = dir
+class QmakeGenerator:
+    def __init__(self):
+        self.__node = None
+
+    def setNode(self, node):
+        self.__node = node
+        return self
+
+    def genTarget(self):
+        assert(self.__node)
+        return QmakeGenerator.createGentor(self.__node).genTarget()
+
+    @staticmethod
+    def createGentor(node):
+        if isinstance(node, BuildNode):
+            return QmakeGenerator.__BuildNodeGentor().setNode(node)
+        else:
+            return QmakeGenerator.__DirNodeGentor().setNode(node)
+
+    class __DirNodeGentor:
+        def __init__(self):
+            self.__node = None
+
+        def setNode(self, node):
+            assert (isinstance(node, DirNode))
+            self.__node = node
+            return self
+
+        def genTarget(self):
+            prjName = ""
+            self.__node.verbose("Start parsing: " + self.__node.getNodeName() + " ---> ")
+            self.__node.createOutDir()
+            if self.__node.hasChild():
+                childPrjList = [] #The node which is able to generate target will be call prjNode
+                for childNode in self.__node.childList:
+                    if childNode == None:
+                        continue
+                    childPrjName = QmakeGenerator.createGentor(childNode).genTarget()
+                    if childPrjName != "":
+                        childPrjList.append(childNode)
+                if len(childPrjList) > 0:
+                    prjName = self.__node.getNodeName()
+                    ContenWriter.write(self.__node.outdir, prjName + ".pro", self.createQmakeContent(childPrjList))
+
+            self.__node.verbose("Parsing done: " + self.__node.getNodeName() + " <--- ")
+            if prjName != "":
+                self.__node.info("--> Project: " + prjName + " created")
+            return prjName
+
+        def createQmakeContent(self, childPrjList):
+            mainContent = "SUBDIRS = "
+            for child in childPrjList:
+                mainContent += child.getNodeName() + " \\\n"
+            return QMAKE_FILE_TEMPLATE_SUBDIRS + mainContent
+
+    class __BuildNodeGentor:
+        def __init__(self):
+            self.__node = None
+
+        def setNode(self, node):
+            assert (isinstance(node, BuildNode))
+            self.__node = node
+            return self
+
+        def genTarget(self):
+            self.__node.verbose("PARSING START: " + self.__node.getNodeName())
+            prjName = ""
+            if not Project.Instance().chooser.choose(self.__node.dir):
+                self.__node.verbose("don't parse " + self.__node.dir)
+                prjName = ""
+            else:
+                self.__node.verbose("START: Parsing gnumake file...")
+                qmakeContent = self.createQmakeContent()
+                if qmakeContent != "":
+                    prjName = self.__node.getNodeName()
+                    ContenWriter.write(self.__node.outdir, prjName + ".pro", qmakeContent)
+                else:
+                    self.__node.info(self.__node.getNodeName() + " ----> EMPTY!!!")
+
+            self.__node.verbose("PARSING DONE: " + self.__node.getNodeName())
+            if prjName != "": self.__node.info(" --> Created sub project: " + prjName)
+
+            return prjName
+
+        @staticmethod
+        def hasData(node):
+            if not node.parsed:
+                raise Exception(node.dir + " hasn't been parsed yet!")
+            return node.defines != "" or node.cflags != "" or node.cxxflags != "" or node.cppFiles != "" or node.workingDir != ""
+
+        def createQmakeContent(self):
+            if self.hasData(self.__node):
+                return QMAKE_FILE_TEMPLATE_APP + \
+                       QMAKE_CC + self.__node.cc + QMAKE_LINE_BREAKS + \
+                       QMAKE_CXX + self.__node.cxx + QMAKE_LINE_BREAKS + \
+                       QMAKE_CFLAGS + self.__node.cflags + QMAKE_LINE_BREAKS + \
+                       QMAKE_CXXFLAGS + self.__node.cxxflags + QMAKE_LINE_BREAKS + \
+                       QMAKE_DEBUGGER + self.__node.dbger + QMAKE_LINE_BREAKS + \
+                       QMAKE_MACROS_DEFINE_KEYWORD + self.__node.defines + QMAKE_LINE_BREAKS + \
+                       QMAKE_INCLUDEPATH_KEYWORD + self.__node.includePaths + QMAKE_LINE_BREAKS + \
+                       QMAKE_SOURCE_KEYWORD + self.__node.cppFiles
+            else:
+                return ""
+
+class GnumakeParser:
+    def __init__(self):
+        self.__rootNode = None
+
+    def setNode(self, node):
+        self.__rootNode = node
+        return self
 
     def parse(self):
-        self.parsed = True
-        srclistFiles = FSUtill.getFilesByType(self.workingDir, ".srclist")
-        gnumakeFiles = FSUtill.getFilesByType(self.workingDir, ".gnumake")
-        for f in srclistFiles:
-            self.__collectSourceFiles(f)
-        for f in gnumakeFiles:
-            self.__parsegnumake(f)
-        self.cppFiles = self.__uniqueLinesInString(self.cppFiles)
-        self.includePaths = self.__uniqueLinesInString(self.includePaths)
-        self.defines = self.__uniqueLinesInString(self.defines).replace("VARIANT_S_FTR_ENABLE_TRC_GEN", "VARIANT_S_FTR_ENABLE_ETG_PRINTF")
+        GnumakeParser.parseNode(self.__rootNode)
+
+    @staticmethod
+    def parseNode(node):
+        node.parsed = True
+        if isinstance(node, BuildNode):
+            srclistFiles = FSUtill.getFilesByType(node.dir, ".srclist")
+            gnumakeFiles = FSUtill.getFilesByType(node.dir, ".gnumake")
+            for f in srclistFiles:
+                GnumakeParser.__collectSourceFiles(node, f)
+            for f in gnumakeFiles:
+                GnumakeParser.__parsegnumake(node, f)
+
+            node.cppFiles = GnumakeParser.__uniqueLinesInString(node.cppFiles)
+            node.includePaths = GnumakeParser.__uniqueLinesInString(node.includePaths)
+            node.defines = GnumakeParser.__uniqueLinesInString(node.defines).replace("VARIANT_S_FTR_ENABLE_TRC_GEN", "VARIANT_S_FTR_ENABLE_ETG_PRINTF")
+        elif isinstance(node, DirNode) and node.hasChild():
+                for childNode in node.childList:
+                    GnumakeParser.parseNode(childNode)
 
 
-    def __uniqueLinesInString(self, str):
+    @staticmethod
+    def __uniqueLinesInString(str):
         return "\n".join(list(OrderedDict.fromkeys(str.split("\n"))))
 
-    def __collectSourceFiles(self, srcListFile):
+    @staticmethod
+    def __collectSourceFiles(node, srcListFile):
         srcFileList = []
         noHeader = True
         f = open(srcListFile, 'r')
@@ -459,32 +561,35 @@ class GnumakeParser:
                         srcFileList.append(os.path.join(folder, file))
 
         for file in srcFileList:
-            self.cppFiles += file + " \\\n"
+            node.cppFiles += file + " \\\n"
 
-    def __parsegnumake(self, gnumakeFile):
-        self.node.verbose("PARSING START: " + gnumakeFile)
-
+    @staticmethod
+    def __parsegnumake(node, gnumakeFile):
+        node.verbose("PARSING START: " + gnumakeFile)
         f = open(gnumakeFile, 'r')
-        lines = f.readlines(); f.close()
+        lines = f.readlines();
+        f.close()
+
         # Get include paths
-        self.includePaths = self.__getMatchedLine(r'^CPP_INCLUDES_.*:=', lines).replace("-I", " \\\n")
+        node.includePaths = GnumakeParser.__getMatchedLine(r'^CPP_INCLUDES_.*:=', lines).replace("-I", " \\\n")
         # Get macros defines
-        self.defines = self.__getMatchedLine(r'^CC_DEFINES.*:=', lines).replace("-D", " \\\n")
+        node.defines = GnumakeParser.__getMatchedLine(r'^CC_DEFINES.*:=', lines).replace("-D", " \\\n")
         # Get cflags
-        self.cflags = self.__getMatchedLine(r'^C_OPTIONS_.*:=', lines)
+        node.cflags = GnumakeParser.__getMatchedLine(r'^C_OPTIONS_.*:=', lines)
         # Get cxxflags
-        self.cxxflags = self.__getMatchedLine(r'^CPP_OPTIONS_.*:=', lines)
-        # Get compilers and GDB paths
-        self.__extractCompilersAndDebugger(lines)
+        node.cxxflags = GnumakeParser.__getMatchedLine(r'^CPP_OPTIONS_.*:=', lines)
+        # Get c compiler path
+        node.cc = GnumakeParser.__getLastWord(GnumakeParser.__getMatchedLine(r'CC:=', lines))
+        # Get c++ compiler path
+        node.cxx = GnumakeParser.__getLastWord(GnumakeParser.__getMatchedLine(r'CPP:=', lines))
+        # Get debugger path
+        node.dbger = GnumakeParser.__getLastWord(GnumakeParser.__getMatchedLine(r'GDB:=', lines))
 
-        self.node.verbose("PARSING DONE: " + gnumakeFile)
+        node.verbose("PARSING DONE: " + gnumakeFile)
 
-    def __extractCompilersAndDebugger(self, lines):
-        self.cc = self.__getLastWord(self.__getMatchedLine(r'CC:=', lines))
-        self.cxx = self.__getLastWord(self.__getMatchedLine(r'CPP:=', lines))
-        self.dbger = self.__getLastWord(self.__getMatchedLine(r'GDB:=', lines))
 
-    def __getLastWord(self, line):
+    @staticmethod
+    def __getLastWord(line):
         if len(line) > 0:
             splited = line.split(" ")
             i = len(splited) - 1
@@ -495,17 +600,17 @@ class GnumakeParser:
                 i -= 1
         return ""
 
-    def __getMatchedLine(self, searchPattern, lines):
+    @staticmethod
+    def __getMatchedLine( searchPattern, lines):
         for line in lines:
             if re.search(searchPattern, line):
                 return re.sub(searchPattern, "", line)
         return ""
 
 # PROGRAM START
-def main():
-    project = Project("gnumake")
-    project.genQmake()
+def program_start():
+    Project.Init().genTarget()
 
 
 if __name__ == '__main__':
-    main()
+    program_start()
