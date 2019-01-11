@@ -72,6 +72,7 @@ class Logger:
 class ContenWriter:
     CONSOLE_DEVICE=1
     FILE_DEVICE=2
+    __impl = None
 
     @staticmethod
     def redirect(to):
@@ -87,11 +88,10 @@ class ContenWriter:
             ContenWriter.__impl = ContenWriter.__FileWriter
         ContenWriter.__impl.write(dir, name, content)
 
-    # The private implementers
-    __impl = None
+
     class __ConsoleWriter:
         def write(self, dir, name, content):
-            name = dir + os.sep + name + ".pro"
+            name = os.path.join(dir, name + ".pro")
             Logger.verbose("START: =============== " + name + " =================")
             Logger.verbose(content)
             Logger.verbose("END: ===============" + name + ".pro=================")
@@ -165,7 +165,7 @@ class ProjectChooserFactory:
         if type == "gnumake":
             return GnumakeProjectChooser()
         else:
-            # With other build system, who will implement?
+            # TBD: With other build system, who will implement?
             return GnumakeProjectChooser()
 
 class ParserFactory:
@@ -176,7 +176,7 @@ class ParserFactory:
         else:
             return None
 
-class GeneratorFactory:
+class CodeGenerator:
     @staticmethod
     def create(type):
         if type == "qmake":
@@ -184,9 +184,12 @@ class GeneratorFactory:
         else:
             return  None
 
+    def genTarget(self):
+        raise Exception("The function has not been overriden by derived class yet")
+
+
 class ProjectArguments:
     def __init__(self):
-        print(sys.argv)
         self.gnumakepath = "T:\\views\\AI_SDS_18.0V17_GEN\\ai_sds\\generated\\build\\gen3armmake\\sds"  # \\asf_cmake\\asf_cmake_a_d"Z:\\views\\nincg3_GEN\\ai_projects\\generated\\build\\gen3armmake\\apphmi_asf_applications\\apphmi_sds-cgi3-rnaivi_out_d" #
         self.outdir = "C:\\Users\\cgo1hc\\Desktop\\qmakeprojects"
         self.variant = "aivi"
@@ -259,7 +262,7 @@ class Project:
         Logger.initialize(Project.__instance.args.verbose)
         ContenWriter.redirect(to=Project.__instance.args.outDevice)
         Project.__instance.chooser = ProjectChooserFactory.create(srcType)
-        Project.__instance.generator = GeneratorFactory.create(destType)
+        Project.__instance.generator = CodeGenerator.create(destType)
         Project.__instance.parser = ParserFactory.create(srcType)
         return Project.__instance
 
@@ -306,24 +309,13 @@ class Project:
 
     def __generateUtilsScripts(self):
         self.__generateRefreshScript()
-        self.__genGuruScript()
 
     def __generateRefreshScript(self):
-        ContenWriter.write(self.args.outdir, "refresh.sh", self.args.reformShellCommand())
-        refreshPath = os.path.join(self.args.outdir, "refresh.sh")
+        script="refresh.sh"
+        Logger.info("Write script for sync between source project vs target project: " + script)
+        ContenWriter.write(self.args.outdir, script, self.args.reformShellCommand())
+        refreshPath = os.path.join(self.args.outdir, script)
         os.chmod(refreshPath, 0755)
-
-    def __genGuruScript(self):
-        scriptName = "findProjectOf.sh"
-        Logger.info("Write file " + scriptName)
-        command = """
-            #!/bin/bash
-            searchFile=$1
-            [[ -z $searchFile ]] && echo 'Please specify a file name' && exit
-            grep $searchFile -ril --include=*.pro {0}
-        """.format(self.args.outdir)
-        ContenWriter.write(self.args.outdir, scriptName, command)
-        os.chmod(os.path.join(self.args.outdir, scriptName), 0755)
 
 
 class DirNode:
@@ -373,12 +365,16 @@ class DirNode:
             self.info("There no child node: " + node)
 
     def __calculateLevel(self):
-        i = 0
-        parent = self.parentNode
-        while parent != None:
-            i = i + 1
-            parent = parent.parentNode
-        return i
+        # i = 0
+        # parent = self.parentNode
+        # while parent != None:
+        #     i = i + 1
+        #     parent = parent.parentNode
+        # return i
+        if self.parentNode == None:
+            return 0
+        else:
+            return self.parentNode.level + 1
 
     def usable(self):
         return self.hasChild()
@@ -399,17 +395,32 @@ class BuildNode(DirNode):
     def usable(self):
         return True
 
-class QmakeGenerator:
+class QmakeGenerator(CodeGenerator):
     def __init__(self):
-        self.__node = None
+        self.__rootNode = None
 
-    def setNode(self, node):
-        self.__node = node
+    def setNode(self, rootNode):
+        self.__rootNode = rootNode
         return self
 
     def genTarget(self):
-        assert(self.__node)
-        return QmakeGenerator.createGentor(self.__node).genTarget()
+        assert(self.__rootNode)
+        ret = QmakeGenerator.createGentor(self.__rootNode).genTarget()
+        if ret:
+            self.__genGuruScript()
+        return ret
+
+    def __genGuruScript(self):
+        scriptName = "findProjectOf.sh"
+        Logger.info("Generate script for finding projects that contain input filename: " + scriptName)
+        command = """
+            #!/bin/bash
+            searchFile=$1
+            [[ -z $searchFile ]] && echo 'Please specify a file name' && exit
+            grep $searchFile -ril --include=*.pro {0}
+        """.format(Project.Instance().args.outdir)
+        ContenWriter.write(Project.Instance().args.outdir, scriptName, command)
+        os.chmod(os.path.join(Project.Instance().args.outdir, scriptName), 0755)
 
     @staticmethod
     def createGentor(node):
